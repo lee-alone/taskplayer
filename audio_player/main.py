@@ -37,7 +37,7 @@ class AudioPlayer:
         # 初始化主窗口
         self.root = tk.Tk()
         self.root.title("任务播放器")
-        self.root.geometry("1200x800")  # 增加默认窗口大小
+        self.root.geometry("1000x700")  # 调整为更合适的初始窗口大小
         
         # 设置图标
         self._set_icon()
@@ -49,7 +49,6 @@ class AudioPlayer:
         self.create_main_layout()
         
         # 设置组件
-        self.setup_search_bar()
         self.setup_tree()
         self.setup_playback_controls()
         self.setup_status_bar()
@@ -65,124 +64,152 @@ class AudioPlayer:
 
     def create_main_layout(self):
         """创建主要布局框架"""
-        # 顶部搜索栏框架
-        self.search_frame = ttk.Frame(self.root, padding="10")
-        self.search_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=10, pady=5)
+        # 创建主框架
+        main_frame = ttk.Frame(self.root)
+        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        self.root.grid_columnconfigure(0, weight=1)
+        self.root.grid_rowconfigure(0, weight=1)
         
-        # 中间任务列表框架
-        self.task_frame = ttk.Frame(self.root, padding="10")
-        self.task_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=10)
+        # 任务列表框架 - 占据大部分空间
+        self.task_frame = ttk.Frame(main_frame)
+        self.task_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=5, pady=5)
+        main_frame.grid_columnconfigure(0, weight=1)
+        main_frame.grid_rowconfigure(0, weight=1)
         
-        # 底部播放控制框架
-        self.control_frame = ttk.Frame(self.root, padding="10")
-        self.control_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), padx=10, pady=5)
+        # 控制面板框架 - 固定高度，紧凑布局
+        self.control_frame = ttk.Frame(main_frame)
+        self.control_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), padx=5)
         
-        # 状态栏框架
-        self.status_frame = ttk.Frame(self.root)
-        self.status_frame.grid(row=3, column=0, sticky=(tk.W, tk.E))
-
-    def setup_search_bar(self):
-        """设置搜索栏"""
-        # 搜索输入框
-        search_container = ttk.Frame(self.search_frame)
-        search_container.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        
-        search_icon = ttk.Label(search_container, text="🔍")
-        search_icon.pack(side=tk.LEFT, padx=(0, 5))
-        
-        self.search_var = tk.StringVar()
-        self.search_var.trace('w', self.filter_tasks)
-        search_entry = ttk.Entry(search_container, textvariable=self.search_var,
-                               font=self.normal_font, width=40)
-        search_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
-        
-        # 搜索类型选择
-        self.search_type = tk.StringVar(value="name")
-        for text, value in [("按名称", "name"), ("按时间", "time"), ("按日期", "date")]:
-            ttk.Radiobutton(search_container, text=text, variable=self.search_type,
-                           value=value, command=self.filter_tasks).pack(side=tk.LEFT, padx=5)
-        
-        # 主题选择
-        theme_frame = ttk.Frame(self.search_frame)
-        theme_frame.pack(side=tk.RIGHT)
-        
-        ttk.Label(theme_frame, text="主题:", font=self.normal_font).pack(side=tk.LEFT, padx=5)
-        themes = ["默认", "暗色", "浅色"]
-        self.theme_var = tk.StringVar(value="默认")
-        theme_combo = ttk.Combobox(theme_frame, values=themes,
-                                 textvariable=self.theme_var, width=8,
-                                 state="readonly")
-        theme_combo.pack(side=tk.LEFT)
-        theme_combo.bind('<<ComboboxSelected>>', self.change_theme)
+        # 状态栏框架 - 底部固定高度
+        self.status_frame = ttk.Frame(main_frame)
+        self.status_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), padx=5)
 
     def setup_playback_controls(self):
         """设置播放控制区域"""
-        # 播放进度条框架
-        progress_frame = ttk.LabelFrame(self.control_frame, text="播放进度", padding="5")
-        progress_frame.pack(fill=tk.X, pady=(0, 10))
+        # 创建播放控制的主框架
+        controls_main_frame = ttk.Frame(self.control_frame)
+        controls_main_frame.pack(fill=tk.X, expand=True, pady=(0, 5))
         
-        self.play_progress_var = tk.DoubleVar()
-        self.play_progress = ttk.Progressbar(progress_frame,
-                                           variable=self.play_progress_var,
-                                           maximum=100)
-        self.play_progress.pack(fill=tk.X, padx=5, pady=5)
+        # 左侧按钮组
+        left_buttons_frame = ttk.Frame(controls_main_frame)
+        left_buttons_frame.pack(side=tk.LEFT, padx=2)
         
-        # 时间显示
-        time_frame = ttk.Frame(progress_frame)
-        time_frame.pack(fill=tk.X, padx=5)
-        
-        self.current_time = ttk.Label(time_frame, text="00:00")
-        self.current_time.pack(side=tk.LEFT)
-        
-        self.total_time = ttk.Label(time_frame, text="/ 00:00")
-        self.total_time.pack(side=tk.RIGHT)
-        
-        # 控制按钮
-        control_buttons_frame = ttk.Frame(self.control_frame)
-        control_buttons_frame.pack(fill=tk.X, pady=5)
-        
-        buttons = [
+        left_buttons = [
             ("新增任务", "🆕", self.add_task),
             ("删除任务", "❌", self.delete_task),
             ("复制任务", "📋", self.copy_task),
             ("导入任务", "📥", self.import_tasks),
             ("导出任务", "📤", self.export_tasks),
-            ("导出Excel", "📊", self.export_to_excel),
-            ("排序任务", "🔄", self.sort_tasks),
+            ("导出Excel", "📊", self.export_to_excel)
+        ]
+        
+        # 创建左侧按钮两行排列
+        for i, (text, icon, command) in enumerate(left_buttons):
+            row = i // 3
+            col = i % 3
+            btn = ttk.Button(left_buttons_frame, 
+                           text=f"{icon} {text}", 
+                           command=command,
+                           style="Custom.TButton",
+                           width=12)
+            btn.grid(row=row, column=col, padx=2, pady=2)
+            
+        # 中间播放控制按钮组 - 垂直排列
+        center_buttons_frame = ttk.Frame(controls_main_frame)
+        center_buttons_frame.pack(side=tk.LEFT, expand=True, padx=10)
+        
+        play_buttons = [
             ("播放任务", "▶", self.play_task),
             ("暂停任务", "⏸", self.pause_task),
-            ("停止任务", "⏹", self.stop_task),
+            ("停止任务", "⏹", self.stop_task)
+        ]
+        
+        for text, icon, command in play_buttons:
+            btn = ttk.Button(center_buttons_frame, 
+                           text=f"{icon} {text}",
+                           command=command,
+                           style="Custom.TButton",
+                           width=12)
+            btn.pack(side=tk.LEFT, padx=5, pady=2)
+            
+        # 右侧功能按钮组 - 两行排列
+        right_buttons_frame = ttk.Frame(controls_main_frame)
+        right_buttons_frame.pack(side=tk.RIGHT, padx=2)
+        
+        right_buttons = [
+            ("排序任务", "🔄", self.sort_tasks),
             ("同步时间", "🕒", self.sync_time),
             ("上移任务", "⬆", self.move_task_up),
             ("下移任务", "⬇", self.move_task_down)
         ]
         
-        for text, icon, command in buttons:
-            btn = ttk.Button(control_buttons_frame, 
-                           text=f"{icon} {text}", 
-                           command=command, 
-                           style="Custom.TButton")
-            btn.pack(side=tk.LEFT, padx=2)
+        for i, (text, icon, command) in enumerate(right_buttons):
+            row = i // 2
+            col = i % 2
+            btn = ttk.Button(right_buttons_frame,
+                           text=f"{icon} {text}",
+                           command=command,
+                           style="Custom.TButton",
+                           width=12)
+            btn.grid(row=row, column=col, padx=2, pady=2)
+            
+        # 播放进度条和时间显示 - 使用更紧凑的布局
+        progress_frame = ttk.LabelFrame(self.control_frame, text="播放进度", padding="3")
+        progress_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        # 时间和进度条在同一行
+        progress_container = ttk.Frame(progress_frame)
+        progress_container.pack(fill=tk.X, padx=5, pady=2)
+        
+        # 当前时间
+        self.current_time = ttk.Label(progress_container, 
+                                    text="00:00",
+                                    font=self.normal_font,
+                                    width=6)
+        self.current_time.pack(side=tk.LEFT, padx=(0, 5))
+        
+        # 进度条
+        self.play_progress_var = tk.DoubleVar()
+        self.play_progress = ttk.Progressbar(progress_container,
+                                           variable=self.play_progress_var,
+                                           maximum=100,
+                                           style="Horizontal.TProgressbar")
+        self.play_progress.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        
+        # 总时间
+        self.total_time = ttk.Label(progress_container,
+                                  text="/ 00:00",
+                                  font=self.normal_font,
+                                  width=8)
+        self.total_time.pack(side=tk.LEFT, padx=(5, 0))
 
     def setup_status_bar(self):
         """设置状态栏"""
+        # 添加状态栏分隔线
         separator = ttk.Separator(self.status_frame, orient="horizontal")
         separator.pack(fill=tk.X)
         
-        status_container = ttk.Frame(self.status_frame, padding="5")
+        # 状态栏容器 - 使用更小的内边距
+        status_container = ttk.Frame(self.status_frame, padding="2")
         status_container.pack(fill=tk.X)
         
-        # 时间显示
-        self.time_label = ttk.Label(status_container, 
-                                  font=self.normal_font,
-                                  anchor="e")
-        self.time_label.pack(side=tk.RIGHT)
+        # 左侧状态信息 - 使用更紧凑的布局
+        left_status_frame = ttk.Frame(status_container)
+        left_status_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
         
-        # 状态信息
-        self.status_label = ttk.Label(status_container,
+        self.status_label = ttk.Label(left_status_frame,
                                     text="就绪",
                                     font=self.normal_font)
-        self.status_label.pack(side=tk.LEFT)
+        self.status_label.pack(side=tk.LEFT, padx=5)
+        
+        # 右侧时间显示 - 固定宽度
+        right_status_frame = ttk.Frame(status_container)
+        right_status_frame.pack(side=tk.RIGHT)
+        
+        self.time_label = ttk.Label(right_status_frame, 
+                                  font=self.normal_font,
+                                  width=20)  # 固定宽度确保时间显示不会抖动
+        self.time_label.pack(side=tk.RIGHT, padx=5)
 
     def _set_icon(self):
         """设置应用程序图标"""
@@ -296,24 +323,24 @@ class AudioPlayer:
         # 定义列
         self.columns = ("序号", "任务名称", "开始时间", "结束时间", "音量", "播放日期/星期", "文件路径", "状态")
         self.tree = ttk.Treeview(tree_frame, columns=self.columns, show="headings", 
-                                selectmode="browse", style="Treeview")
+                                selectmode="browse", style="Treeview", height=20)  # 设置固定高度
         
         # 设置列标题和列宽
         column_widths = {
-            "序号": 60,
-            "任务名称": 200,
-            "开始时间": 100,
-            "结束时间": 100,
-            "音量": 80,
-            "播放日期/星期": 150,
-            "文件路径": 300,
-            "状态": 100
+            "序号": 50,
+            "任务名称": 180,
+            "开始时间": 80,
+            "结束时间": 80,
+            "音量": 60,
+            "播放日期/星期": 120,
+            "文件路径": 250,
+            "状态": 80
         }
         
         # 配置列
         for col in self.columns:
             self.tree.heading(col, text=col, command=lambda c=col: self.sort_by_column(c))
-            self.tree.column(col, width=column_widths[col], 
+            self.tree.column(col, width=column_widths[col], minwidth=column_widths[col],
                            anchor="center" if col not in ["文件路径", "任务名称"] else "w")
         
         # 配置标签样式
@@ -1056,7 +1083,8 @@ class AddTaskWindow:
         self.selected_item = selected_item
         self.window = tk.Toplevel(player.root)
         self.window.title("修改任务" if task_data else "新增任务")
-        self.window.geometry("500x600")
+        self.window.geometry("900x600")  # 调整为更宽的窗口以适应左右布局
+        self.window.minsize(900, 600)    # 设置最小窗口大小
         self.window.configure(bg="#f5f6f7")
         self.window.protocol("WM_DELETE_WINDOW", self.on_closing)
         
@@ -1067,50 +1095,54 @@ class AddTaskWindow:
         # 设置窗口在父窗口中居中
         self.center_window()
         
+        # 创建左右主框架
+        self.main_frame = ttk.Frame(self.window, padding="10")
+        self.main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 创建左侧面板
+        self.left_panel = ttk.Frame(self.main_frame)
+        self.left_panel.pack(side=tk.LEFT, fill=tk.BOTH, padx=(0, 10), expand=True)
+        
+        # 创建右侧面板
+        self.right_panel = ttk.Frame(self.main_frame)
+        self.right_panel.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # 设置UI组件
         self.setup_ui(task_data)
 
-    def center_window(self):
-        parent = self.window.master
-        self.window.update_idletasks()
-        width = self.window.winfo_width()
-        height = self.window.winfo_height()
-        x = parent.winfo_x() + (parent.winfo_width() - width) // 2
-        y = parent.winfo_y() + (parent.winfo_height() - height) // 2
-        self.window.geometry(f"{width}x{height}+{x}+{y}")
-
-    def on_closing(self):
-        if self.preview_playing:
-            pygame.mixer.music.stop()
-        self.player.add_task_window = None
-        self.window.destroy()
-
     def setup_ui(self, task_data):
-        main_frame = ttk.Frame(self.window, padding="20")
-        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        self.window.grid_columnconfigure(0, weight=1)
-        self.window.grid_rowconfigure(0, weight=1)
+        # 左侧面板组件
+        self.setup_left_panel(task_data)
+        
+        # 右侧面板组件
+        self.setup_right_panel(task_data)
 
-        # Task name
-        self.setup_task_name(main_frame, task_data)
-        
-        # Date/Weekday selection
-        self.setup_date_selection(main_frame, task_data)
-        
+    def setup_right_panel(self, task_data):
         # Time setting
-        self.setup_time_setting(main_frame, task_data)
+        self.setup_time_setting(self.right_panel, task_data)
+        ttk.Separator(self.right_panel, orient="horizontal").pack(fill=tk.X, pady=15)
         
         # File path
-        self.setup_file_path(main_frame, task_data)
+        self.setup_file_path(self.right_panel, task_data)
+        ttk.Separator(self.right_panel, orient="horizontal").pack(fill=tk.X, pady=15)
         
         # Volume
-        self.setup_volume(main_frame, task_data)
+        self.setup_volume(self.right_panel, task_data)
         
-        # Buttons
-        self.setup_buttons(main_frame)
+        # 底部按钮
+        self.setup_buttons(self.right_panel)
+
+    def setup_left_panel(self, task_data):
+        # Task name
+        self.setup_task_name(self.left_panel, task_data)
+        ttk.Separator(self.left_panel, orient="horizontal").pack(fill=tk.X, pady=15)
+        
+        # Date/Weekday selection
+        self.setup_date_selection(self.left_panel, task_data)
 
     def setup_task_name(self, parent, task_data):
-        frame = ttk.LabelFrame(parent, text="任务名称", padding="5")
-        frame.grid(row=0, column=0, pady=5, sticky=(tk.W, tk.E))
+        frame = ttk.LabelFrame(parent, text="任务名称", padding="10")
+        frame.pack(fill=tk.X)
         
         self.task_name_entry = ttk.Entry(frame, font=self.player.normal_font)
         self.task_name_entry.pack(fill=tk.X, padx=5, pady=5)
@@ -1118,27 +1150,33 @@ class AddTaskWindow:
             self.task_name_entry.insert(0, task_data[1])
 
     def setup_date_selection(self, parent, task_data=None):
-        date_frame = ttk.LabelFrame(parent, text="日期设置", padding="5")
-        date_frame.grid(row=1, column=0, pady=5, sticky=(tk.W, tk.E))
+        date_frame = ttk.LabelFrame(parent, text="日期设置", padding="10")
+        date_frame.pack(fill=tk.BOTH, expand=True)
 
         # Radio buttons for date/weekday selection
         radio_frame = ttk.Frame(date_frame)
         radio_frame.pack(fill=tk.X, padx=5, pady=5)
 
         self.date_weekday_var = tk.IntVar()
+        # 创建两个固定宽度的单选按钮
+        rb_width = 20  # 设置固定宽度
         ttk.Radiobutton(radio_frame, text="单次日期", variable=self.date_weekday_var,
-                       value=0, command=self.show_date).pack(side=tk.LEFT, padx=10)
+                       value=0, command=self.show_date, width=rb_width).pack(side=tk.LEFT, padx=10)
         ttk.Radiobutton(radio_frame, text="每周重复", variable=self.date_weekday_var,
-                       value=1, command=self.show_weekday).pack(side=tk.LEFT, padx=10)
+                       value=1, command=self.show_weekday, width=rb_width).pack(side=tk.LEFT, padx=10)
+
+        # Calendar container
+        self.cal_container = ttk.Frame(date_frame)
+        self.cal_container.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         # Calendar with custom style
-        self.cal = Calendar(date_frame, selectmode="day", date_pattern="yyyy-mm-dd",
+        self.cal = Calendar(self.cal_container, selectmode="day", date_pattern="yyyy-mm-dd",
                           background="#4a90e2", foreground="white",
                           headersbackground="#2c5282", headersforeground="white",
                           selectbackground="#2c5282", selectforeground="white",
                           normalbackground="#ffffff", normalforeground="black",
                           weekendbackground="#f0f0f0", weekendforeground="black")
-        self.cal.pack(padx=5, pady=5)
+        self.cal.pack(pady=5, fill=tk.BOTH, expand=True)
 
         # Weekday selection
         self.setup_weekday_selection(date_frame, task_data)
@@ -1174,14 +1212,17 @@ class AddTaskWindow:
         checkbutton_frame.pack(fill=tk.X, padx=5)
 
         self.weekday_vars = []
-        for day in ["一", "二", "三", "四", "五", "六", "日"]:
+        weekday_grid = ttk.Frame(checkbutton_frame)
+        weekday_grid.pack(fill=tk.X, expand=True)
+
+        for i, day in enumerate(["一", "二", "三", "四", "五", "六", "日"]):
             var = tk.BooleanVar()
-            cb = ttk.Checkbutton(checkbutton_frame, text=day, variable=var)
-            cb.pack(side=tk.LEFT, padx=5)
+            cb = ttk.Checkbutton(weekday_grid, text=day, variable=var)
+            cb.grid(row=0, column=i, padx=5)
             self.weekday_vars.append(var)
 
         quick_select_frame = ttk.Frame(self.weekdays_frame)
-        quick_select_frame.pack(fill=tk.X, pady=5)
+        quick_select_frame.pack(fill=tk.X, pady=10)
 
         ttk.Button(quick_select_frame, text="工作日", style="Custom.TButton",
                   command=self.select_workdays).pack(side=tk.LEFT, padx=5)
@@ -1193,8 +1234,8 @@ class AddTaskWindow:
         self.weekdays_frame.pack_forget()
 
     def setup_time_setting(self, parent, task_data=None):
-        time_frame = ttk.LabelFrame(parent, text="时间设置", padding="5")
-        time_frame.grid(row=2, column=0, pady=5, sticky=(tk.W, tk.E))
+        time_frame = ttk.LabelFrame(parent, text="时间设置", padding="10")
+        time_frame.pack(fill=tk.X)
 
         spinner_frame = ttk.Frame(time_frame)
         spinner_frame.pack(fill=tk.X, padx=5, pady=5)
@@ -1314,8 +1355,8 @@ class AddTaskWindow:
         entry.configure(validate="key", validatecommand=vcmd)
 
     def setup_file_path(self, parent, task_data=None):
-        file_frame = ttk.LabelFrame(parent, text="音频文件", padding="5")
-        file_frame.grid(row=3, column=0, pady=5, sticky=(tk.W, tk.E))
+        file_frame = ttk.LabelFrame(parent, text="音频文件", padding="10")
+        file_frame.pack(fill=tk.X)
 
         file_entry_frame = ttk.Frame(file_frame)
         file_entry_frame.pack(fill=tk.X, padx=5, pady=5)
@@ -1331,8 +1372,8 @@ class AddTaskWindow:
             self.file_path_entry.insert(0, task_data[6])
 
     def setup_volume(self, parent, task_data=None):
-        volume_frame = ttk.LabelFrame(parent, text="音量控制", padding="5")
-        volume_frame.grid(row=4, column=0, pady=5, sticky=(tk.W, tk.E))
+        volume_frame = ttk.LabelFrame(parent, text="音量控制", padding="10")
+        volume_frame.pack(fill=tk.X)
 
         volume_control_frame = ttk.Frame(volume_frame)
         volume_control_frame.pack(fill=tk.X, padx=5, pady=5)
@@ -1371,7 +1412,7 @@ class AddTaskWindow:
             self.volume_scale.set(task_data[4])
             update_volume()
         else:
-            self.volume_scale.set(50)
+            self.volume_scale.set(100)
             update_volume()
 
     def toggle_preview(self):
@@ -1396,23 +1437,25 @@ class AddTaskWindow:
 
     def setup_buttons(self, parent):
         button_frame = ttk.Frame(parent)
-        button_frame.grid(row=5, column=0, pady=15, sticky=(tk.W, tk.E))
+        button_frame.pack(fill=tk.X, pady=15)
 
-        save_btn = ttk.Button(button_frame, text="✔ 保存", style="Custom.TButton",
-                            command=self.save_task)
-        save_btn.pack(side=tk.RIGHT, padx=5)
-
+        # 取消按钮放在右边
         cancel_btn = ttk.Button(button_frame, text="✖ 取消", style="Custom.TButton",
-                             command=self.on_closing)
+                             command=self.on_closing, width=15)
         cancel_btn.pack(side=tk.RIGHT, padx=5)
 
+        # 保存按钮放在取消按钮左边
+        save_btn = ttk.Button(button_frame, text="✔ 保存", style="Custom.TButton",
+                            command=self.save_task, width=15)
+        save_btn.pack(side=tk.RIGHT, padx=5)
+
     def show_date(self):
-        self.cal.pack()
         self.weekdays_frame.pack_forget()
+        self.cal.pack(in_=self.cal_container, fill=tk.BOTH, expand=True)
 
     def show_weekday(self):
         self.cal.pack_forget()
-        self.weekdays_frame.pack()
+        self.weekdays_frame.pack(in_=self.cal_container, fill=tk.BOTH, expand=True)
 
     def select_workdays(self):
         for i, var in enumerate(self.weekday_vars):
@@ -1561,6 +1604,21 @@ class AddTaskWindow:
             date_str,                            # 播放日期/星期
             file_path                            # 文件路径
         ]
+
+    def center_window(self):
+        parent = self.window.master
+        self.window.update_idletasks()
+        width = self.window.winfo_width()
+        height = self.window.winfo_height()
+        x = parent.winfo_x() + (parent.winfo_width() - width) // 2
+        y = parent.winfo_y() + (parent.winfo_height() - height) // 2
+        self.window.geometry(f"{width}x{height}+{x}+{y}")
+
+    def on_closing(self):
+        if self.preview_playing:
+            pygame.mixer.music.stop()
+        self.player.add_task_window = None
+        self.window.destroy()
 
 if __name__ == "__main__":
     player = AudioPlayer()
