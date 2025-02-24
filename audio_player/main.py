@@ -36,7 +36,8 @@ class AudioPlayer:
         # 初始化主窗口
         self.root = tk.Tk()
         self.root.title("任务播放器")
-        self.root.geometry("1000x700")  # 调整为更合适的初始窗口大小
+        self.root.geometry("1024x768")  # 更现代的窗口尺寸
+        self.root.minsize(800, 600)     # 设置最小窗口大小
         
         # 设置图标
         self._set_icon()
@@ -57,41 +58,39 @@ class AudioPlayer:
         self.update_time()
         self.check_tasks()
         
-        # 配置窗口布局
-        self.root.grid_rowconfigure(1, weight=1)  # 任务列表区域可扩展
+        # 配置窗口布局权重
+        self.root.grid_rowconfigure(0, weight=1)  # 主框架可扩展
         self.root.grid_columnconfigure(0, weight=1)
 
     def create_main_layout(self):
         """创建主要布局框架"""
         # 创建主框架
         main_frame = ttk.Frame(self.root)
-        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        self.root.grid_columnconfigure(0, weight=1)
-        self.root.grid_rowconfigure(0, weight=1)
+        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=10, pady=10)
         
-        # 任务列表框架 - 占据大部分空间
+        # 任务列表框架
         self.task_frame = ttk.Frame(main_frame)
-        self.task_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=5, pady=5)
+        self.task_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
         main_frame.grid_columnconfigure(0, weight=1)
         main_frame.grid_rowconfigure(0, weight=1)
         
-        # 控制面板框架 - 固定高度，紧凑布局
+        # 控制面板框架
         self.control_frame = ttk.Frame(main_frame)
-        self.control_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), padx=5)
+        self.control_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
         
-        # 状态栏框架 - 底部固定高度
+        # 状态栏框架
         self.status_frame = ttk.Frame(main_frame)
-        self.status_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), padx=5)
+        self.status_frame.grid(row=2, column=0, sticky=(tk.W, tk.E))
 
     def setup_playback_controls(self):
         """设置播放控制区域"""
         # 创建播放控制的主框架
-        controls_main_frame = ttk.Frame(self.control_frame)
-        controls_main_frame.pack(fill=tk.X, expand=True, pady=(0, 5))
+        controls_main_frame = ttk.Frame(self.control_frame, style="TFrame")
+        controls_main_frame.pack(fill=tk.X, expand=True)
         
-        # 左侧按钮组
+        # 左侧按钮组 - 使用网格布局
         left_buttons_frame = ttk.Frame(controls_main_frame)
-        left_buttons_frame.pack(side=tk.LEFT, padx=2)
+        left_buttons_frame.pack(side=tk.LEFT, padx=(0, 20))
         
         left_buttons = [
             ("新增任务", "🆕", self.add_task),
@@ -101,38 +100,40 @@ class AudioPlayer:
             ("导出任务", "📤", self.export_tasks),
         ]
         
-        # 创建左侧按钮两行排列
         for i, (text, icon, command) in enumerate(left_buttons):
             row = i // 3
             col = i % 3
             btn = ttk.Button(left_buttons_frame, 
-                           text=f"{icon} {text}", 
-                           command=command,
-                           style="Custom.TButton",
-                           width=12)
-            btn.grid(row=row, column=col, padx=2, pady=2)
-            
-        # 中间播放控制按钮组 - 垂直排列
+                          text=f"{icon} {text}", 
+                          command=command,
+                          style="Custom.TButton",
+                          width=10)
+            btn.grid(row=row, column=col, padx=3, pady=3)
+        
+        # 中间播放控制按钮组
         center_buttons_frame = ttk.Frame(controls_main_frame)
-        center_buttons_frame.pack(side=tk.LEFT, expand=True, padx=10)
+        center_buttons_frame.pack(side=tk.LEFT, padx=20)
         
         play_buttons = [
             ("播放任务", "▶", self.play_task),
-            ("暂停任务", "⏸", self.pause_task),
             ("停止任务", "⏹", self.stop_task)
         ]
-        
+
+        self.play_buttons_ref = {}
         for text, icon, command in play_buttons:
-            btn = ttk.Button(center_buttons_frame, 
-                           text=f"{icon} {text}",
-                           command=command,
-                           style="Custom.TButton",
-                           width=12)
-            btn.pack(side=tk.LEFT, padx=5, pady=2)
-            
-        # 右侧功能按钮组 - 两行排列
+            btn = ttk.Button(center_buttons_frame,
+                          text=f"{icon} {text}",
+                          command=command,
+                          style="Custom.TButton",
+                          width=12)
+            btn.pack(side=tk.LEFT, padx=5)
+            self.play_buttons_ref[text] = btn
+            if text in ["停止任务"]:
+                btn.config(state="disabled")
+        
+        # 右侧功能按钮组 - 使用网格布局
         right_buttons_frame = ttk.Frame(controls_main_frame)
-        right_buttons_frame.pack(side=tk.RIGHT, padx=2)
+        right_buttons_frame.pack(side=tk.RIGHT)
         
         right_buttons = [
             ("排序任务", "🔄", self.sort_tasks),
@@ -145,41 +146,28 @@ class AudioPlayer:
             row = i // 2
             col = i % 2
             btn = ttk.Button(right_buttons_frame,
-                           text=f"{icon} {text}",
-                           command=command,
-                           style="Custom.TButton",
-                           width=12)
-            btn.grid(row=row, column=col, padx=2, pady=2)
-            
-        # 播放进度条和时间显示 - 使用更紧凑的布局
-        progress_frame = ttk.LabelFrame(self.control_frame, text="播放进度", padding="3")
-        progress_frame.pack(fill=tk.X, pady=(0, 5))
+                          text=f"{icon} {text}",
+                          command=command,
+                          style="Custom.TButton",
+                          width=10)
+            btn.grid(row=row, column=col, padx=3, pady=3)
         
-        # 时间和进度条在同一行
+        # 播放进度条区域
+        progress_frame = ttk.LabelFrame(self.control_frame, text="播放进度")
+        progress_frame.pack(fill=tk.X, pady=(10, 0))
+        
         progress_container = ttk.Frame(progress_frame)
-        progress_container.pack(fill=tk.X, padx=5, pady=2)
+        progress_container.pack(fill=tk.X, padx=10, pady=5)
+
+        # 时间显示和进度条
+        self.time_var = tk.StringVar(value="00:00:00 / 00:00:00")
+        time_label = ttk.Label(progress_container, textvariable=self.time_var,
+                            style="Custom.TLabel", width=20)
+        time_label.pack(side=tk.LEFT, padx=(0, 10))
         
-        # 当前时间
-        self.current_time = ttk.Label(progress_container, 
-                                    text="00:00",
-                                    font=self.normal_font,
-                                    width=6)
-        self.current_time.pack(side=tk.LEFT, padx=(0, 5))
-        
-        # 进度条
-        self.play_progress_var = tk.DoubleVar()
-        self.play_progress = ttk.Progressbar(progress_container,
-                                           variable=self.play_progress_var,
-                                           maximum=100,
-                                           style="Horizontal.TProgressbar")
-        self.play_progress.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        
-        # 总时间
-        self.total_time = ttk.Label(progress_container,
-                                  text="/ 00:00",
-                                  font=self.normal_font,
-                                  width=8)
-        self.total_time.pack(side=tk.LEFT, padx=(5, 0))
+        self.progress_bar = ttk.Progressbar(progress_container, orient="horizontal",
+                                        mode="determinate", style="Horizontal.TProgressbar")
+        self.progress_bar.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
     def setup_status_bar(self):
         """设置状态栏"""
@@ -187,27 +175,27 @@ class AudioPlayer:
         separator = ttk.Separator(self.status_frame, orient="horizontal")
         separator.pack(fill=tk.X)
         
-        # 状态栏容器 - 使用更小的内边距
-        status_container = ttk.Frame(self.status_frame, padding="2")
-        status_container.pack(fill=tk.X)
+        # 状态栏容器
+        status_container = ttk.Frame(self.status_frame, style="TFrame")
+        status_container.pack(fill=tk.X, padx=10, pady=5)
         
-        # 左侧状态信息 - 使用更紧凑的布局
+        # 左侧状态信息
         left_status_frame = ttk.Frame(status_container)
         left_status_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
         
         self.status_label = ttk.Label(left_status_frame,
-                                    text="就绪",
-                                    font=self.normal_font)
-        self.status_label.pack(side=tk.LEFT, padx=5)
+                                   text="就绪",
+                                   style="Custom.TLabel")
+        self.status_label.pack(side=tk.LEFT)
         
-        # 右侧时间显示 - 固定宽度
+        # 右侧时间显示
         right_status_frame = ttk.Frame(status_container)
         right_status_frame.pack(side=tk.RIGHT)
         
-        self.time_label = ttk.Label(right_status_frame, 
-                                  font=self.normal_font,
-                                  width=20)  # 固定宽度确保时间显示不会抖动
-        self.time_label.pack(side=tk.RIGHT, padx=5)
+        self.time_label = ttk.Label(right_status_frame,
+                                 style="Custom.TLabel",
+                                 width=20)
+        self.time_label.pack(side=tk.RIGHT)
 
     def _set_icon(self):
         """设置应用程序图标"""
@@ -264,53 +252,78 @@ class AudioPlayer:
     def setup_styles(self):
         """设置界面样式"""
         # 设置字体
-        self.title_font = Font(family="Microsoft YaHei", size=12, weight="bold")
+        self.title_font = Font(family="Microsoft YaHei", size=11, weight="bold")
         self.normal_font = Font(family="Microsoft YaHei", size=10)
         
-        # 设置主题样式
         style = ttk.Style()
         style.theme_use('clam')
         
-        # 配置Treeview样式
+        # 主色调
+        primary_color = "#2196f3"
+        secondary_color = "#1976d2" 
+        
+        # Treeview样式
         style.configure("Treeview",
                     background="#ffffff",
                     fieldbackground="#ffffff",
-                    foreground="black",
+                    foreground="#333333",
                     font=self.normal_font,
-                    rowheight=25)
+                    rowheight=28)
         
         style.configure("Treeview.Heading",
-                    background="#4a90e2",
+                    background=primary_color,
                     foreground="white",
                     font=self.title_font,
-                    relief="flat")
+                    relief="flat",
+                    padding=(5, 2))
         
         style.map("Treeview.Heading",
-                background=[('active', '#2c5282')])
+                background=[('active', secondary_color)])
+                
+        style.map("Treeview",
+                background=[('selected', primary_color)],
+                foreground=[('selected', 'white')])
         
-        # 配置Button样式
+        # Button样式
         style.configure("Custom.TButton",
                     font=self.normal_font,
-                    padding=5)
+                    padding=(10, 5))
         
         style.map("Custom.TButton",
-                background=[('active', '#4a90e2'), ('pressed', '#2c5282')],
+                background=[('active', primary_color), ('pressed', secondary_color)],
                 foreground=[('active', 'white'), ('pressed', 'white')])
 
-        # 配置进度条样式
+        # 进度条样式
         style.configure("Horizontal.TProgressbar",
-                    background="#4a90e2",
-                    troughcolor="#f0f0f0",
+                    background=primary_color,
+                    troughcolor="#f5f5f5",
                     bordercolor="#e0e0e0",
-                    lightcolor="#6ab7ff",
-                    darkcolor="#1976d2")
+                    lightcolor="#64b5f6",
+                    darkcolor=secondary_color)
 
-        # 配置其他控件样式
+        # 其他控件样式
         style.configure("Custom.TLabel",
                     font=self.normal_font)
         
         style.configure("Title.TLabel",
                     font=self.title_font)
+                    
+        # 分割线样式
+        style.configure("TSeparator",
+                    background="#e0e0e0")
+                    
+        # Frame样式
+        style.configure("TFrame",
+                    background="#ffffff")
+        
+        # LabelFrame样式
+        style.configure("TLabelframe",
+                    background="#ffffff",
+                    padding=5)
+        
+        style.configure("TLabelframe.Label",
+                    font=self.title_font,
+                    foreground="#424242")
         
     def setup_tree(self):
         """设置任务列表"""
@@ -430,11 +443,11 @@ class AudioPlayer:
         item = selected[0]
         if item == self.current_playing_item:
             if self.paused:
-                self.play_task(item)
+                self.play_task(item)  # 继续播放
             else:
-                self.pause_task()
+                self.pause_task()  # 暂停播放
         else:
-            self.play_task(item)
+            self.play_task(item)  # 播放新的任务
 
     def update_task_status(self, item, status_text, status_tag):
         """更新任务状态"""
@@ -632,7 +645,7 @@ class AudioPlayer:
             if not item and not file_path:
                 selected = self.tree.selection()
                 if not selected:
-                    messagebox.showinfo("提示", "请先选择要播放的任务")
+                    messagebox.showinfo("提示", "请先选择要播放的文件")
                     return
                 item = selected[0]
                 
@@ -643,41 +656,33 @@ class AudioPlayer:
                 
             # 停止当前播放
             if self.current_playing_sound:
-                self.stop_task()
+                if not self.paused:
+                    self.pause_task()  # 如果已经在播放但未暂停，则先暂停
                 
             # 播放新任务
             if self._safe_play_audio(file_path, volume):
                 self.current_playing_sound = file_path
                 self.current_playing_item = item
                 self.paused = False
-                
-                # 更新状态
+
+                # 更新状态和按钮
                 self.update_task_status(item, "正在播放", 'playing')
-                
+                self.play_buttons_ref["停止任务"].config(state="normal")
+                self.play_buttons_ref["播放文件"].config(text="⏸ 暂停播放")
+
                 # 重置并显示进度条
                 self.play_progress_var.set(0)
-                
+
                 # 启动进度更新线程
                 self.stop_thread = False
                 self.playing_thread = threading.Thread(target=self.update_play_progress)
                 self.playing_thread.daemon = True
                 self.playing_thread.start()
-                
+
         except Exception as e:
             messagebox.showerror("错误", f"播放失败: {str(e)}")
             if item:
                 self.update_task_status(item, "播放失败", 'error')
-
-    def pause_task(self):
-        if self.current_playing_sound:
-            if self.paused:
-                pygame.mixer.music.unpause()
-                self.paused = False
-                self.update_task_status(self.current_playing_item, "正在播放", 'playing')
-            else:
-                pygame.mixer.music.pause()
-                self.paused = True
-                self.update_task_status(self.current_playing_item, "已暂停", 'paused')
 
     def stop_task(self):
         if self.current_playing_sound:
@@ -689,7 +694,17 @@ class AudioPlayer:
             self.current_playing_sound = None
             self.current_playing_item = None
             self.paused = False
-            self.play_progress_frame.grid_remove()
+            self.play_buttons_ref["停止任务"].config(state="disabled")
+            self.play_buttons_ref["播放文件"].config(text="▶ 播放文件")
+
+    def pause_task(self):
+        """暂停播放"""
+        if self.current_playing_sound and not self.paused:
+            pygame.mixer.music.pause()
+            self.paused = True
+            self.update_task_status(self.current_playing_item, "已暂停", 'paused')
+            self.play_buttons_ref["播放文件"].config(text="▶ 播放文件")
+
 
     def sync_time(self):
         try:
