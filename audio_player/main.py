@@ -20,6 +20,15 @@ except ImportError as e:
 
 class AudioPlayer:
     def __init__(self):
+        # 初始化主窗口必须在最前面
+        self.root = tk.Tk()
+        self.root.title("任务播放器")
+        self.root.geometry("1024x768")  # 更现代的窗口尺寸
+        self.root.minsize(800, 600)     # 设置最小窗口大小
+
+        # 创建进度条变量
+        # self.play_progress_var = tk.DoubleVar()
+        
         # 初始化音频系统
         pygame.init()
         pygame.mixer.init()
@@ -32,12 +41,10 @@ class AudioPlayer:
         self.playing_thread = None
         self.stop_thread = False
         self.current_playing_item = None
-        
-        # 初始化主窗口
-        self.root = tk.Tk()
-        self.root.title("任务播放器")
-        self.root.geometry("1024x768")  # 更现代的窗口尺寸
-        self.root.minsize(800, 600)     # 设置最小窗口大小
+
+        # 时间显示标签
+        self.current_time = None
+        self.total_time = None
         
         # 设置图标
         self._set_icon()
@@ -115,8 +122,8 @@ class AudioPlayer:
         center_buttons_frame.pack(side=tk.LEFT, padx=20)
         
         play_buttons = [
-            ("播放任务", "▶", self.play_task),
-            ("停止任务", "⏹", self.stop_task)
+            ("播放/暂停", "▶", self.toggle_play_task),
+            ("停止", "⏹", self.stop_task)
         ]
 
         self.play_buttons_ref = {}
@@ -128,8 +135,9 @@ class AudioPlayer:
                           width=12)
             btn.pack(side=tk.LEFT, padx=5)
             self.play_buttons_ref[text] = btn
-            if text in ["停止任务"]:
-                btn.config(state="disabled")
+
+        # 初始状态禁用停止按钮
+        self.play_buttons_ref["停止"].config(state="disabled")
         
         # 右侧功能按钮组 - 使用网格布局
         right_buttons_frame = ttk.Frame(controls_main_frame)
@@ -153,21 +161,26 @@ class AudioPlayer:
             btn.grid(row=row, column=col, padx=3, pady=3)
         
         # 播放进度条区域
-        progress_frame = ttk.LabelFrame(self.control_frame, text="播放进度")
-        progress_frame.pack(fill=tk.X, pady=(10, 0))
+        # progress_frame = ttk.LabelFrame(self.control_frame, text="播放进度")
+        # progress_frame.pack(fill=tk.X, pady=(10, 0))
         
-        progress_container = ttk.Frame(progress_frame)
-        progress_container.pack(fill=tk.X, padx=10, pady=5)
+        # progress_container = ttk.Frame(progress_frame)
+        # progress_container.pack(fill=tk.X, padx=10, pady=5)
 
         # 时间显示和进度条
-        self.time_var = tk.StringVar(value="00:00:00 / 00:00:00")
-        time_label = ttk.Label(progress_container, textvariable=self.time_var,
-                            style="Custom.TLabel", width=20)
-        time_label.pack(side=tk.LEFT, padx=(0, 10))
+        # self.time_var = tk.StringVar(value="00:00:00 / 00:00:00")
+        # time_label = ttk.Label(progress_container, textvariable=self.time_var,
+        #                     style="Custom.TLabel", width=20)
+        # time_label.pack(side=tk.LEFT, padx=(0, 10))
+        # self.current_time = time_label
+
+        # self.total_time = ttk.Label(progress_container, style="Custom.TLabel", width=20)
+        # self.total_time.pack(side=tk.LEFT, padx=(0, 10))
+
         
-        self.progress_bar = ttk.Progressbar(progress_container, orient="horizontal",
-                                        mode="determinate", style="Horizontal.TProgressbar")
-        self.progress_bar.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        # self.progress_bar = ttk.Progressbar(progress_container, orient="horizontal",
+        #                                 mode="determinate", style="Horizontal.TProgressbar")
+        # self.progress_bar.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
     def setup_status_bar(self):
         """设置状态栏"""
@@ -211,20 +224,22 @@ class AudioPlayer:
         try:
             if not os.path.exists(file_path):
                 raise FileNotFoundError("音频文件不存在")
-                
+
             sound = pygame.mixer.Sound(file_path)
             self.current_playing_duration = sound.get_length()
             pygame.mixer.music.load(file_path)
             pygame.mixer.music.set_volume(volume / 100)
             pygame.mixer.music.play()
-            
+
             # 更新初始时间显示
             total_str = time.strftime('%M:%S', time.gmtime(self.current_playing_duration))
-            self.current_time.config(text="00:00")
-            self.total_time.config(text=f"/ {total_str}")
-            
+            if self.current_time:
+                self.current_time.configure(text="00:00")
+            if self.total_time:
+                self.total_time.configure(text=f"/ {total_str}")
+
             return True
-            
+
         except Exception as e:
             messagebox.showerror("播放错误", f"播放音频失败: {str(e)}")
             return False
@@ -670,15 +685,17 @@ class AudioPlayer:
             if self._safe_play_audio(file_path, volume):
                 self.current_playing_sound = file_path
                 self.current_playing_item = item
-                self.paused = False
-
+                
+                
+                if self.paused:
+                    pygame.mixer.music.play(start=self.current_playing_position / 1000)
+                    self.paused = False
+                else:
+                    self.paused = False
                 # 更新状态和按钮
                 self.update_task_status(item, "正在播放", 'playing')
-                self.play_buttons_ref["停止任务"].config(state="normal")
-                self.play_buttons_ref["播放文件"].config(text="⏸ 暂停播放")
-
-                # 重置并显示进度条
-                self.play_progress_var.set(0)
+                self.play_buttons_ref["停止"].config(state="normal")
+                self.play_buttons_ref["播放/暂停"].config(text="⏸ 暂停")
 
                 # 启动进度更新线程
                 self.stop_thread = False
@@ -692,26 +709,72 @@ class AudioPlayer:
                 self.update_task_status(item, "播放失败", 'error')
 
     def stop_task(self):
+        """停止播放任务"""
         if self.current_playing_sound:
             self.stop_thread = True
             if self.playing_thread:
                 self.playing_thread.join()
             pygame.mixer.music.stop()
             self.update_task_status(self.current_playing_item, "等待播放", 'waiting')
-            self.current_playing_sound = None
+            self.current_playing_sound = ""
             self.current_playing_item = None
             self.paused = False
-            self.play_buttons_ref["停止任务"].config(state="disabled")
-            self.play_buttons_ref["播放文件"].config(text="▶ 播放文件")
+            
+            # 重置按钮状态
+            self.play_buttons_ref["停止"].config(state="disabled")
+            self.play_buttons_ref["播放/暂停"].config(text="▶ 播放/暂停")
+            
+            # 重置进度条和时间显示
+            # self.play_progress_var.set(0)
+            if self.current_time:
+                self.current_time.config(text="00:00")
+            if self.total_time:
+                self.total_time.config(text="/ 00:00")
+            self.status_label.config(text="就绪")
 
     def pause_task(self):
         """暂停播放"""
         if self.current_playing_sound and not self.paused:
             pygame.mixer.music.pause()
             self.paused = True
+            self.current_playing_position = pygame.mixer.music.get_pos()
             self.update_task_status(self.current_playing_item, "已暂停", 'paused')
             self.play_buttons_ref["播放文件"].config(text="▶ 播放文件")
 
+    def toggle_play_task(self):
+        """切换播放/暂停状态"""
+        if not self.current_playing_sound or self.current_playing_sound == "":
+            # 开始新的播放
+            selected = self.tree.selection()
+            if not selected:
+                messagebox.showinfo("提示", "请先选择要播放的任务")
+                return
+            self.play_task(selected[0])
+        else:
+            # 切换暂停/继续状态
+            if pygame.mixer.music.get_busy():
+                if self.paused:
+                    pygame.mixer.music.unpause()
+                    self.paused = False
+                    self.update_task_status(self.current_playing_item, "正在播放", 'playing')
+                    self.play_buttons_ref["播放/暂停"].config(text="⏸ 暂停")
+                else:
+                    pygame.mixer.music.pause()
+                    self.paused = True
+                    self.update_task_status(self.current_playing_item, "已暂停", 'paused')
+                    self.play_buttons_ref["播放/暂停"].config(text="▶ 继续")
+            else:
+                if self.paused: # if it was paused, resume
+                    pygame.mixer.music.unpause()
+                    self.paused = False
+                    self.update_task_status(self.current_playing_item, "正在播放", 'playing')
+                    self.play_buttons_ref["播放/暂停"].config(text="⏸ 暂停")
+                else: # if not paused, start new playback
+                    selected = self.tree.selection()
+                    if not selected:
+                        messagebox.showinfo("提示", "请先选择要播放的任务")
+                        return
+                    self.play_task(selected[0])
 
     def sync_time(self):
         try:
@@ -942,20 +1005,21 @@ class AudioPlayer:
     def update_play_progress(self):
         """更新播放进度"""
         try:
-            start_time = time.time()
             while not self.stop_thread and pygame.mixer.music.get_busy():
                 if not self.paused:
-                    elapsed = time.time() - start_time
+                    # 获取当前播放位置（毫秒）
+                    current_position = pygame.mixer.music.get_pos() / 1000  # 转换为秒
+                    elapsed = current_position
                     progress = min((elapsed / self.current_playing_duration) * 100, 100)
-                    
+
                     # 在主线程中更新UI
                     self.root.after(0, self._update_progress_ui, elapsed, progress)
-                    
+
                 time.sleep(0.1)
-                
+
             if not self.stop_thread:  # 正常播放结束
                 self.root.after(0, self._on_playback_complete)
-                
+
         except Exception as e:
             print(f"Warning: Progress update error: {e}")
             self.root.after(0, self.stop_task)
@@ -963,18 +1027,18 @@ class AudioPlayer:
     def _update_progress_ui(self, elapsed, progress):
         """更新进度条UI"""
         try:
-            self.play_progress_var.set(progress)
+            # self.play_progress_var.set(progress)
             
             # 更新时间显示
             elapsed_str = time.strftime('%M:%S', time.gmtime(elapsed))
             total_str = time.strftime('%M:%S', time.gmtime(self.current_playing_duration))
-            self.current_time.config(text=elapsed_str)
-            self.total_time.config(text=f"/ {total_str}")
+            # self.current_time.config(text=elapsed_str)
+            # self.total_time.config(text=f"/ {total_str}")
             
             # 更新任务状态
             if self.current_playing_item:
                 values = self.tree.item(self.current_playing_item)["values"]
-                self.status_label.config(text=f"正在播放：{values[1]} ({elapsed_str}/{total_str})")
+                self.status_label.config(text=f"当前播放文件：{values[1]} ({elapsed_str}/{total_str})")
                 
         except Exception as e:
             print(f"Warning: UI update error: {e}")
