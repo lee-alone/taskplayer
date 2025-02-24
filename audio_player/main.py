@@ -5,7 +5,6 @@ import datetime
 import json
 import os
 from tkinter.font import Font
-import pandas as pd  # 用于Excel导出
 import threading
 import time
 
@@ -100,7 +99,6 @@ class AudioPlayer:
             ("复制任务", "📋", self.copy_task),
             ("导入任务", "📥", self.import_tasks),
             ("导出任务", "📤", self.export_tasks),
-            ("导出Excel", "📊", self.export_to_excel)
         ]
         
         # 创建左侧按钮两行排列
@@ -749,7 +747,7 @@ class AudioPlayer:
         """导入任务"""
         file_path = filedialog.askopenfilename(
             title="导入任务",
-            filetypes=[("JSON文件", "*.json"), ("Excel文件", "*.xlsx"), ("所有文件", "*.*")]
+            filetypes=[("JSON文件", "*.json"), ("所有文件", "*.*")]
         )
         
         if not file_path:
@@ -758,14 +756,9 @@ class AudioPlayer:
         try:
             self.status_label.config(text="正在导入...")
             
-            if (file_path.lower().endswith('.xlsx')):
-                # 从Excel导入
-                df = pd.read_excel(file_path)
-                tasks = df.to_dict('records')
-            else:
-                # 从JSON导入
-                with open(file_path, "r", encoding="utf-8") as f:
-                    tasks = json.load(f)
+            # 从JSON导入
+            with open(file_path, "r", encoding="utf-8") as f:
+                tasks = json.load(f)
             
             # 清空现有任务
             if messagebox.askyesno("确认", "是否清空现有任务？"):
@@ -970,89 +963,6 @@ class AudioPlayer:
             self.update_task_status(self.current_playing_item, "等待播放", 'waiting')
         self.stop_task()
         self.status_label.config(text="就绪")
-
-    def export_to_excel(self):
-        """导出到Excel"""
-        try:
-            file_path = filedialog.asksaveasfilename(
-                title="导出到Excel",
-                defaultextension=".xlsx",
-                filetypes=[("Excel文件", "*.xlsx"), ("所有文件", "*.*")]
-            )
-            
-            if not file_path:
-                return
-                
-            # 准备数据
-            data = []
-            columns = list(self.columns)  # 使用已定义的列名
-            
-            self.status_label.config(text="正在导出数据...")
-            total_items = len(self.tree.get_children())
-            
-            for i, item in enumerate(self.tree.get_children()):
-                # 更新进度
-                progress = (i + 1) / total_items * 100
-                self.play_progress_var.set(progress)
-                self.root.update()
-                
-                values = list(self.tree.item(item)["values"])
-                # 确保所有行都有相同的列数
-                while len(values) < len(columns):
-                    values.append("")
-                data.append(values)
-            
-            df = pd.DataFrame(data, columns=columns)
-            
-            # 使用 ExcelWriter 添加格式
-            writer = pd.ExcelWriter(file_path, engine='xlsxwriter')
-            df.to_excel(writer, index=False, sheet_name="任务列表")
-            
-            # 获取workbook和worksheet对象
-            workbook = writer.book
-            worksheet = writer.sheets['任务列表']
-            
-            # 定义格式
-            header_format = workbook.add_format({
-                'bold': True,
-                'bg_color': '#4a90e2',
-                'font_color': 'white',
-                'border': 1,
-                'align': 'center',
-                'valign': 'vcenter'
-            })
-            
-            content_format = workbook.add_format({
-                'align': 'left',
-                'valign': 'vcenter',
-                'text_wrap': True
-            })
-            
-            # 应用格式
-            for col_num, value in enumerate(df.columns.values):
-                worksheet.write(0, col_num, value, header_format)
-                # 设置列格式
-                if value in ["文件路径", "任务名称"]:
-                    worksheet.set_column(col_num, col_num, 30, content_format)
-                else:
-                    worksheet.set_column(col_num, col_num, 15, content_format)
-            
-            # 冻结首行
-            worksheet.freeze_panes(1, 0)
-            
-            # 添加自动筛选
-            worksheet.autofilter(0, 0, len(data), len(columns)-1)
-            
-            writer.close()
-            
-            self.play_progress_var.set(0)
-            self.status_label.config(text=f"已成功导出 {len(data)} 个任务到 Excel")
-            messagebox.showinfo("成功", "成功导出到Excel文件")
-            
-        except Exception as e:
-            self.play_progress_var.set(0)
-            self.status_label.config(text="导出失败")
-            messagebox.showerror("错误", f"导出失败: {str(e)}")
 
     def copy_task(self):
         selected = self.tree.selection()
