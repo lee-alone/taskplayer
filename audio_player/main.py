@@ -615,9 +615,25 @@ class AudioPlayer:
             print(f"Warning: Failed to add task: {e}")
 
     def add_task(self):
-         if not hasattr(self, 'add_task_window') or self.add_task_window is None:
-            self.add_task_window = AddTaskWindow(self)
-         else:
+        if not hasattr(self, 'add_task_window') or self.add_task_window is None:
+            # 获取当前选中的任务（如果有）
+            selected = self.tree.selection()
+            if selected:
+                # 获取选中任务的结束时间
+                selected_item = selected[0]
+                task_data = self.tree.item(selected_item)['values']
+                end_time = task_data[3]
+                
+                # 构造新的task_data，其中包含结束时间作为开始时间
+                new_task_data = ["", "", end_time, "", "", "", ""]
+                self.add_task_window = AddTaskWindow(self, task_data=new_task_data)
+            else:
+                # 如果没有选中任务，则使用当前时间
+                now = datetime.datetime.now()
+                current_time = now.strftime("%H:%M:%S")
+                new_task_data = ["", "", current_time, "", "", "", ""]
+                self.add_task_window = AddTaskWindow(self, task_data=new_task_data)
+        else:
             self.add_task_window.window.focus()
 
     def delete_task(self):
