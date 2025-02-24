@@ -615,24 +615,15 @@ class AudioPlayer:
             print(f"Warning: Failed to add task: {e}")
 
     def add_task(self):
-        if not hasattr(self, 'add_task_window') or self.add_task_window is None:
-            # 获取当前选中的任务（如果有）
-            selected = self.tree.selection()
-            if selected:
-                # 获取选中任务的结束时间
-                selected_item = selected[0]
-                task_data = self.tree.item(selected_item)['values']
-                end_time = task_data[3]
+        default_end_time = "08:00:00"
+        selected = self.tree.selection()
+        if selected:
+            values = self.tree.item(selected[0])['values']
+            if len(values) > 3:  # 确保有结束时间
+                default_end_time = values[3]
                 
-                # 构造新的task_data，其中包含结束时间作为开始时间
-                new_task_data = ["", "", end_time, "", "", "", ""]
-                self.add_task_window = AddTaskWindow(self, task_data=new_task_data)
-            else:
-                # 如果没有选中任务，则使用当前时间
-                now = datetime.datetime.now()
-                current_time = now.strftime("%H:%M:%S")
-                new_task_data = ["", "", current_time, "", "", "", ""]
-                self.add_task_window = AddTaskWindow(self, task_data=new_task_data)
+        if not hasattr(self, 'add_task_window') or self.add_task_window is None:
+            self.add_task_window = AddTaskWindow(self, default_time=default_end_time)
         else:
             self.add_task_window.window.focus()
 
@@ -1019,9 +1010,10 @@ class AudioPlayer:
 
 
 class AddTaskWindow:
-    def __init__(self, player, task_data=None, selected_item=None):
+    def __init__(self, player, task_data=None, selected_item=None, default_time="08:00:00"):
         self.player = player
         self.selected_item = selected_item
+        self.default_time = default_time
         self.window = tk.Toplevel(player.root)
         self.window.title("修改任务" if task_data else "新增任务")
         self.window.geometry("900x600")  # 调整为更宽的窗口以适应左右布局
@@ -1229,7 +1221,17 @@ class AddTaskWindow:
                 self.minute_var.set(times[1].zfill(2))
                 self.second_var.set(times[2].zfill(2))
             except:
-                pass
+                # 如果解析失败，使用默认时间
+                times = self.default_time.split(":")
+                self.hour_var.set(times[0].zfill(2))
+                self.minute_var.set(times[1].zfill(2))
+                self.second_var.set(times[2].zfill(2))
+        else:
+            # 新建任务时使用默认时间
+            times = self.default_time.split(":")
+            self.hour_var.set(times[0].zfill(2))
+            self.minute_var.set(times[1].zfill(2))
+            self.second_var.set(times[2].zfill(2))
 
     def bind_time_controls(self, var, up_btn, down_btn, max_val):
         def validate_time(value):
@@ -1350,7 +1352,11 @@ class AddTaskWindow:
         self.volume_scale.bind("<ButtonRelease-1>", update_volume)
 
         if task_data:
-            self.volume_scale.set(task_data[4])
+            try:
+                volume = int(task_data[4])
+            except (ValueError, IndexError):
+                volume = 100  # Default volume
+            self.volume_scale.set(volume)
             update_volume()
         else:
             self.volume_scale.set(100)
