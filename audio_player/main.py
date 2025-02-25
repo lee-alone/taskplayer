@@ -1063,7 +1063,12 @@ class AudioPlayer:
             # 重置状态
             if len(values) > 7:
                 values = values[:7]
-            self.save_task_data(values[1:])  # 不包含序号
+            # 生成新的任务ID
+            new_id = len(self.tree.get_children()) + 1
+            values[0] = new_id
+            # 将新任务添加到 tree 控件中
+            self.tree.insert("", "end", values=values)
+            self.save_all_tasks()
 
     def update_time(self):
         """更新状态栏时间显示"""
