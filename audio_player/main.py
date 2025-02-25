@@ -144,9 +144,8 @@ class AudioPlayer:
         right_buttons_frame.pack(side=tk.RIGHT)
         
         right_buttons = [
-            ("排序任务", "🔄", self.sort_tasks),
-            ("同步时间", "🕒", self.sync_time),
             ("上移任务", "⬆", self.move_task_up),
+            ("同步时间", "🕒", self.sync_time),
             ("下移任务", "⬇", self.move_task_down)
         ]
         
@@ -817,16 +816,6 @@ class AudioPlayer:
             f.truncate()
             json.dump(data, f, ensure_ascii=False, indent=4)
 
-    def sort_tasks(self):
-        tasks = [(self.tree.set(item, "开始时间"), 
-                 self.tree.set(item, "播放日期"), 
-                 item) for item in self.tree.get_children()]
-        tasks.sort(key=lambda x: (x[1] if x[1] else "9999-99-99", x[0]))
-        
-        for index, (_, _, item) in enumerate(tasks):
-            self.tree.move(item, '', index)
-        
-        self.update_task_order()
 
     def import_tasks(self):
         """导入任务"""
