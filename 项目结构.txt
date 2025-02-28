@@ -1,0 +1,10 @@
+audio_player/
+│
+├── __init__.py
+├── main.py
+├── audio_player.py
+├── add_task_window.py
+├── utils.py
+├── constants.py
+├── task.json
+└── icon.ico
