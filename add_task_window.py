@@ -9,15 +9,24 @@ from constants import TASK_FILE_PATH, TITLE_FONT, NORMAL_FONT, PRIMARY_COLOR, SE
 
 class AddTaskWindow:
     def __init__(self, player, task_data=None, selected_item=None, default_time="08:00:00"):
+        import logging
+        logging.info("开始构造 AddTaskWindow")
         self.player = player
         self.selected_item = selected_item
         self.default_time = default_time
         self.preview_playing = False
         self.preview_sound = None
-        self.setup_window()
-        self.setup_ui(task_data)
-        if task_data:
-            self.load_task_data(task_data)
+        try:
+            self.setup_window()
+            logging.info("setup_window 完成")
+            self.setup_ui(task_data)
+            logging.info("setup_ui 完成")
+            if task_data:
+                self.load_task_data(task_data)
+                logging.info("load_task_data 完成")
+        except Exception as e:
+            logging.error(f"AddTaskWindow 构造失败: {e}")
+            raise  # 抛出异常以便捕获
 
     def setup_window(self):
         self.window = tk.Toplevel(self.player.root)
@@ -435,92 +444,29 @@ class AddTaskWindow:
         ]
 
     def save_task_data(self, task_data, selected_item=None):
-        task_file = TASK_FILE_PATH
-        
         try:
-            with open(task_file, "r+", encoding="utf-8") as f:
-                try:
-                    data = json.load(f)
-                except json.JSONDecodeError:
-                    data = []
-
-                if selected_item:  # 更新现有任务
-                    index = self.player.tree.index(selected_item)
-                    current_values = list(self.player.tree.item(selected_item)['values'])
-                    
-                    updated_task = [
-                        current_values[0],  # 序号
-                        task_data[0],      # 任务名称
-                        task_data[1],      # 开始时间
-                        task_data[2],      # 结束时间
-                        task_data[3],      # 音量
-                        task_data[4],      # 播放日期/星期
-                        task_data[5]       # 文件路径
-                    ]
-
-                    self.player.tree.item(selected_item, values=updated_task)
-
-                    data[index] = updated_task
-                else:  # 添加新任务
-                    new_id = len(data) + 1
-                    new_task = [
-                        new_id,        # 序号
-                        task_data[0],  # 任务名称
-                        task_data[1],  # 开始时间
-                        task_data[2],  # 结束时间
-                        task_data[3],  # 音量
-                        task_data[4],  # 播放日期/星期
-                        task_data[5]   # 文件路径
-                    ]
-                    
-
-                    self.player.tree.insert("", "end", values=new_task)
-
-                    data.append(new_task)
-                f.seek(0)
-                f.truncate()
-                json.dump(data, f, ensure_ascii=False, indent=4)
-
-            # Update task status in the treeview
+            # 构造任务数据
+            new_task = [
+                "0",           # 临时 ID，稍后由主程序更新
+                task_data[0],  # 任务名称
+                task_data[1],  # 开始时间
+                task_data[2],  # 结束时间
+                task_data[3],  # 音量
+                task_data[4],  # 播放日期/星期
+                task_data[5],  # 文件路径
+                "waiting"      # 默认状态
+            ]
+            
+            # 更新或插入 Treeview
             if selected_item:
-                # 编辑任务
-                item = selected_item
+                self.player.tree.item(selected_item, values=new_task)
             else:
-                # 新增任务
-                item = self.player.tree.get_children()[-1] if self.player.tree.get_children() else None
-
-            if item:
-                task_values = list(self.player.tree.item(item)['values'])
-                start_time_str = task_values[2]
-                end_time_str = task_values[3]
-                schedule_str = task_values[5]
-                status_text = "等待播放"
-                try:
-                    start_time = datetime.datetime.strptime(start_time_str, "%H:%M:%S").time()
-                    end_time = datetime.datetime.strptime(end_time_str, "%H:%M:%S").time()
-                    now = datetime.datetime.now()
-                    current_time = now.time()
-                    current_date = now.strftime("%Y-%m-%d")
-
-                    if "," in schedule_str:
-                        weekdays = [day.strip() for day in schedule_str.split(",")]
-                        current_weekday = ["一", "二", "三", "四", "五", "六", "日"][now.weekday()]
-                        if current_weekday in weekdays:
-                            if start_time <= current_time and current_time <= end_time:
-                                status_text = "正在播放"
-                            elif current_time > end_time:
-                                status_text = "已播放"
-                    else:
-                        if schedule_str == current_date:
-                            if start_time <= current_time and current_time <= end_time:
-                                status_text = "正在播放"
-                            elif current_time >= end_time:
-                                status_text = "已播放"
-                except ValueError as e:
-                    print(f"Invalid time format: {e}")
-                self.update_task_status_in_tree(item, status_text)
-
-        except (IOError, json.JSONDecodeError) as e:
+                self.player.tree.insert("", "end", values=new_task)
+            
+            # 调用主程序的保存方法
+            self.player.save_all_tasks()
+        
+        except Exception as e:
             raise Exception(f"保存任务数据失败: {str(e)}")
     
     def update_task_status_in_tree(self, item, status_text):
@@ -548,8 +494,9 @@ class AddTaskWindow:
     def on_closing(self):
         if self.preview_playing:
             pygame.mixer.music.stop()
+        if self.window.winfo_exists():
+            self.window.destroy()
         self.player.add_task_window = None
-        self.window.destroy()
 
     def load_task_data(self, task_data):
         self.task_name_entry.insert(0, task_data[1])
