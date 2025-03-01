@@ -16,10 +16,12 @@ class AddTaskWindow:
         self.preview_sound = None
         self.setup_window()
         self.setup_ui(task_data)
+        if task_data:
+            self.load_task_data(task_data)
 
     def setup_window(self):
         self.window = tk.Toplevel(self.player.root)
-        self.window.title("修改任务" if self.selected_item else "新增任务")
+        self.window.title("调整任务")
         self.window.geometry("900x600")
         self.window.minsize(900, 600)
         self.window.configure(bg="#f5f6f7")
@@ -52,11 +54,11 @@ class AddTaskWindow:
     def setup_task_name(self, parent, task_data):
         frame = ttk.LabelFrame(parent, text="任务名称", padding="10")
         frame.pack(fill=tk.X)
-        
         self.task_name_entry = ttk.Entry(frame, font=NORMAL_FONT)
         self.task_name_entry.pack(fill=tk.X, padx=5, pady=5)
-        if task_data:
-            self.task_name_entry.insert(0, task_data[1])
+        #if task_data:
+        #    self.task_name_entry.insert(0, task_data[1])
+
 
     def setup_date_selection(self, parent, task_data=None):
         date_frame = ttk.LabelFrame(parent, text="日期设置", padding="10")
@@ -495,3 +497,22 @@ class AddTaskWindow:
             pygame.mixer.music.stop()
         self.player.add_task_window = None
         self.window.destroy()
+
+    def load_task_data(self, task_data):
+        self.task_name_entry.insert(0, task_data[1])
+        self.volume_scale.set(int(task_data[4]))
+        if not self.file_path_entry.get(): # 避免重复插入
+            self.file_path_entry.insert(0, task_data[6])
+        if "," in task_data[5]:
+            self.date_weekday_var.set(1)
+            weekdays = [day.strip() for day in task_data[5].split(",")]
+            for i, day in enumerate(["一", "二", "三", "四", "五", "六", "日"]):
+                self.weekday_vars[i].set(day in weekdays)
+            self.show_weekday()
+        else:
+            self.date_weekday_var.set(0)
+            try:
+                self.cal.selection_set(task_data[5])
+            except:
+                pass
+            self.show_date()

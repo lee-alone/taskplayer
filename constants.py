@@ -10,8 +10,8 @@ DEFAULT_WINDOW_SIZE = "1024x768"
 MIN_WINDOW_SIZE = (800, 600)
 
 # 字体设置
-TITLE_FONT = ("Segoe UI", 14, "bold")  # Or "Arial" if Segoe UI unavailable
-NORMAL_FONT = ("Segoe UI", 11)
+TITLE_FONT = ("Segoe UI", 12, "bold")  # Or "Arial" if Segoe UI unavailable
+NORMAL_FONT = ("Segoe UI", 10)
 
 # 颜色设置
 PRIMARY_COLOR = "#26A69A"    # Teal

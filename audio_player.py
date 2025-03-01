@@ -53,10 +53,10 @@ class AudioPlayer:
         self._set_icon()
         self.root.protocol("WM_DELETE_WINDOW", self.on_window_close)
         # Add container for shadow effect
-        container = tk.Frame(self.root, bg="#B0BEC5", padx=5, pady=5)
-        container.pack(fill="both", expand=True, padx=10, pady=10)
-        self.main_frame = ttk.Frame(container)
-        self.main_frame.pack(fill="both", expand=True)
+        self.root.grid_rowconfigure(0, weight=1)
+        self.root.grid_columnconfigure(0, weight=1)
+        self.main_frame = ttk.Frame(self.root)
+        self.main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=10, pady=10)
     def init_variables(self):
         pygame.init()
         pygame.mixer.init()
@@ -123,25 +123,19 @@ class AudioPlayer:
 
     def create_main_layout(self):
         """Set up the main layout with fully responsive grid."""
-        main_frame = ttk.Frame(self.main_frame)
-        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=10, pady=10)
+        self.task_frame = ttk.Frame(self.main_frame)
+        self.task_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=10, pady=10)
         
-        self.task_frame = ttk.Frame(main_frame)
-        self.task_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        self.control_frame = ttk.Frame(self.main_frame)
+        self.control_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), padx=10, pady=10)
         
-        self.control_frame = ttk.Frame(main_frame)
-        self.control_frame.grid(row=1, column=0, sticky=(tk.W, tk.E))
+        self.status_frame = ttk.Frame(self.main_frame)
+        self.status_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), padx=10, pady=10)
         
-        self.status_frame = ttk.Frame(main_frame)
-        self.status_frame.grid(row=2, column=0, sticky=(tk.W, tk.E))
-        
-        # Configure weights for even distribution
-        main_frame.grid_columnconfigure(0, weight=1)
-        main_frame.grid_rowconfigure(0, weight=3)  # Treeview gets more space
-        main_frame.grid_rowconfigure(1, weight=1)  # Buttons get moderate space
-        main_frame.grid_rowconfigure(2, weight=1)  # Status bar gets minimal space
-        self.root.grid_rowconfigure(0, weight=1)
-        self.root.grid_columnconfigure(0, weight=1)
+        self.main_frame.grid_columnconfigure(0, weight=1)
+        self.main_frame.grid_rowconfigure(0, weight=3)  # Treeview gets more space
+        self.main_frame.grid_rowconfigure(1, weight=1)  # Buttons get moderate space
+        self.main_frame.grid_rowconfigure(2, weight=1)  # Status bar gets minimal space
 
     def setup_components(self):
         self.setup_tree()
@@ -172,10 +166,17 @@ class AudioPlayer:
         vsb = ttk.Scrollbar(tree_frame, orient="vertical", command=self.tree.yview)
         hsb = ttk.Scrollbar(tree_frame, orient="horizontal", command=self.tree.xview)
         self.tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+        
+        # Place Treeview and scrollbars in the grid with sticky
         self.tree.grid(row=0, column=0, sticky=(tk.N, tk.S, tk.E, tk.W))
         vsb.grid(row=0, column=1, sticky=(tk.N, tk.S))
         hsb.grid(row=1, column=0, sticky=(tk.E, tk.W))
+        
+        # Ensure task_frame expands with main_frame
+        self.task_frame.grid_columnconfigure(0, weight=1)
+        self.task_frame.grid_rowconfigure(0, weight=1)
 
+        self.tree.bind("<Double-1>", self.edit_task)
 
     def toggle_playback(self, event=None):
         """Toggle playback state of the selected or currently playing task."""
@@ -270,7 +271,7 @@ class AudioPlayer:
         
         right_status_frame = tk.Frame(status_container, bg=BACKGROUND_COLOR)
         right_status_frame.pack(side=tk.RIGHT)
-        self.time_label = ttk.Label(right_status_frame, style="Custom.TLabel", width=20)
+        self.time_label = ttk.Label(right_status_frame, style="Custom.TLabel", width=25)
         self.time_label.pack(side=tk.RIGHT, padx=5)
 
     def load_tasks(self):
@@ -342,9 +343,21 @@ class AudioPlayer:
 
     def update_time(self):
         current_time = datetime.datetime.now()
-        time_str = current_time.strftime("%Y-%m-%d %H:%M:%S")
+        weekday_str = current_time.strftime("%A") # 获取英文星期几全称
+        weekday_zh = { # 英文星期几到中文星期几的映射
+            "Monday": "星期一",
+            "Tuesday": "星期二",
+            "Wednesday": "星期三",
+            "Thursday": "星期四",
+            "Friday": "星期五",
+            "Saturday": "星期六",
+            "Sunday": "星期日",
+        }.get(weekday_str, weekday_str) # 默认使用英文星期几，防止映射失败
+        date_str = current_time.strftime("%Y-%m-%d") # 获取日期
+        time_str = current_time.strftime("%H:%M:%S") # 获取时间
+        time_str = date_str + " " + weekday_zh + " " + time_str # 组合成 "日期 星期几 时间" 格式
         self.time_label.config(text=time_str)
-        self.root.after(1000, self.update_time)
+        self.root.after(500, self.update_time)
 
     def check_tasks(self):
         try:
@@ -358,9 +371,9 @@ class AudioPlayer:
                 start_time_str = values[2]
                 try:
                     start_time = datetime.datetime.strptime(start_time_str, "%H:%M:%S").time()
-                    now = datetime.datetime.now().time()
+                    now = current_time.time()
                     if start_time <= now and values[-1] != "已播放":
-                        self.update_task_status(item, "已播放", 'playing')
+                        self.play_task(item)
                         continue
                 except ValueError:
                     logging.warning(f"Invalid start time format: {start_time_str}")
@@ -375,7 +388,7 @@ class AudioPlayer:
         except Exception as e:
             logging.warning(f"Task check error: {e}")
         finally:
-            self.root.after(1000, self.check_tasks)
+            self.root.after(500, self.check_tasks)
 
     def _should_play_task(self, values, current_time, current_weekday, current_date):
         try:
@@ -383,7 +396,15 @@ class AudioPlayer:
             task_date = values[5]
             task_time_obj = datetime.datetime.strptime(task_time, "%H:%M:%S").time()
             current_time_obj = current_time.time()
-            time_match = (task_time_obj.hour == current_time_obj.hour and task_time_obj.minute == current_time_obj.minute and abs(task_time_obj.second - current_time_obj.second) <= 1)
+            time_match = (task_time_obj.hour == current_time_obj.hour and task_time_obj.minute == current_time_obj.minute and task_time_obj.second == current_time_obj.second)
+            if not time_match:
+                return False
+            if "," in task_date:
+                weekdays = [day.strip() for day in task_date.split(",")]
+                return current_weekday in weekdays
+            else:
+                return task_date == current_date
+            logging.info(f"Task Check - Task: {values[1]}, Task Time: {task_time_obj}, Current Time: {current_time_obj}, Time Match: {time_match}, Date Match: {date_match}") # 添加日志
             if not time_match:
                 return False
             if "," in task_date:
@@ -488,7 +509,7 @@ class AudioPlayer:
     def _on_playback_complete(self):
         if self.current_playing_item:
             self.update_task_status(self.current_playing_item, "已播放", 'waiting')
-        self.stop_task()
+        
         self.status_label.config(text="就绪")
 
     def update_task_status(self, item, status_text, status_tag):
@@ -520,7 +541,7 @@ class AudioPlayer:
             selected_item = self.tree.selection()[0]
             task_data = self.tree.item(selected_item)['values']
             if not hasattr(self, 'add_task_window') or self.add_task_window is None:
-                self.add_task_window = AddTaskWindow(self, task_data=task_data, selected_item=selected_item)
+                self.add_task_window = AddTaskWindow(player=self, task_data=task_data, selected_item=selected_item)
             else:
                 self.add_task_window.window.focus()
         except IndexError:
@@ -687,7 +708,6 @@ class AudioPlayer:
 
     def run(self):
         self.root.mainloop()
-
 
 
 
