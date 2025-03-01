@@ -457,9 +457,9 @@ class AddTaskWindow:
                         task_data[4],      # 播放日期/星期
                         task_data[5]       # 文件路径
                     ]
-                    
-                    self.player.tree.item(selected_item, values=updated_task + ["等待播放"])
-                    
+
+                    self.player.tree.item(selected_item, values=updated_task)
+
                     data[index] = updated_task
                 else:  # 添加新任务
                     new_id = len(data) + 1
@@ -473,15 +473,68 @@ class AddTaskWindow:
                         task_data[5]   # 文件路径
                     ]
                     
-                    self.player.tree.insert("", "end", values=new_task + ["等待播放"])
-                    
+
+                    self.player.tree.insert("", "end", values=new_task)
+
                     data.append(new_task)
-                
                 f.seek(0)
                 f.truncate()
                 json.dump(data, f, ensure_ascii=False, indent=4)
+
+            # Update task status in the treeview
+            if selected_item:
+                # 编辑任务
+                item = selected_item
+            else:
+                # 新增任务
+                item = self.player.tree.get_children()[-1] if self.player.tree.get_children() else None
+
+            if item:
+                task_values = list(self.player.tree.item(item)['values'])
+                start_time_str = task_values[2]
+                end_time_str = task_values[3]
+                schedule_str = task_values[5]
+                status_text = "等待播放"
+                try:
+                    start_time = datetime.datetime.strptime(start_time_str, "%H:%M:%S").time()
+                    end_time = datetime.datetime.strptime(end_time_str, "%H:%M:%S").time()
+                    now = datetime.datetime.now()
+                    current_time = now.time()
+                    current_date = now.strftime("%Y-%m-%d")
+
+                    if "," in schedule_str:
+                        weekdays = [day.strip() for day in schedule_str.split(",")]
+                        current_weekday = ["一", "二", "三", "四", "五", "六", "日"][now.weekday()]
+                        if current_weekday in weekdays:
+                            if start_time <= current_time and current_time <= end_time:
+                                status_text = "正在播放"
+                            elif current_time > end_time:
+                                status_text = "已播放"
+                    else:
+                        if schedule_str == current_date:
+                            if start_time <= current_time and current_time <= end_time:
+                                status_text = "正在播放"
+                            elif current_time >= end_time:
+                                status_text = "已播放"
+                except ValueError as e:
+                    print(f"Invalid time format: {e}")
+                self.update_task_status_in_tree(item, status_text)
+
         except (IOError, json.JSONDecodeError) as e:
             raise Exception(f"保存任务数据失败: {str(e)}")
+    
+    def update_task_status_in_tree(self, item, status_text):
+        if item:
+            values = list(self.player.tree.item(item)["values"])
+            tags = list(self.player.tree.item(item)["tags"])
+            if len(values) < len(self.player.columns):
+                values.append("")
+            values[-1] = status_text
+            tags = [tag for tag in tags if tag not in ['playing', 'paused', 'waiting', 'error']]
+            status_tag = 'playing' if status_text in ["已播放", "正在播放"] else 'waiting'
+            tags.append(status_tag)
+            self.player.tree.item(item, values=values, tags=tags)
+            self.player.status_label.config(text=f"当前任务：{values[1]} - {status_text}")
 
     def center_window(self):
         parent = self.window.master

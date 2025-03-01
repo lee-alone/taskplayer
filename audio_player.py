@@ -151,11 +151,12 @@ class AudioPlayer:
         
         self.columns = ("序号", "任务名称", "开始时间", "结束时间", "音量", "播放日期/星期", "文件路径", "状态")
         self.tree = ttk.Treeview(tree_frame, columns=self.columns, show="headings", selectmode="browse", style="Treeview")
-        column_widths = {"序号": 50, "任务名称": 180, "开始时间": 80, "结束时间": 80, "音量": 60, "播放日期/星期": 120, "文件路径": 250, "状态": 80}
+        column_widths = {"序号": 70, "任务名称": 180, "开始时间": 80, "结束时间": 80, "音量": 60, "播放日期/星期": 120, "文件路径": 250, "状态": 80}  # 稍微加宽 "序号" 列以容纳符号
         for col in self.columns:
             self.tree.heading(col, text=col, command=lambda c=col: self.sort_by_column(c))
             self.tree.column(col, width=column_widths[col], minwidth=column_widths[col], anchor="center" if col not in ["文件路径", "任务名称"] else "w", stretch=True)
-        # Configure Treeview tags
+        
+        # 配置 Treeview tags（保持不变）
         self.tree.tag_configure('playing', foreground='#4CAF50', background='#E8F5E9')
         self.tree.tag_configure('paused', foreground='#FFA000', background='#FFF3E0')
         self.tree.tag_configure('waiting', foreground='#757575')
@@ -163,20 +164,33 @@ class AudioPlayer:
         self.tree.tag_configure('selected', background='#E3F2FD')
         self.tree.tag_configure('oddrow', background="#F5F7FA")
         self.tree.tag_configure('evenrow', background=BACKGROUND_COLOR)
+        
         vsb = ttk.Scrollbar(tree_frame, orient="vertical", command=self.tree.yview)
         hsb = ttk.Scrollbar(tree_frame, orient="horizontal", command=self.tree.xview)
         self.tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
         
-        # Place Treeview and scrollbars in the grid with sticky
         self.tree.grid(row=0, column=0, sticky=(tk.N, tk.S, tk.E, tk.W))
         vsb.grid(row=0, column=1, sticky=(tk.N, tk.S))
         hsb.grid(row=1, column=0, sticky=(tk.E, tk.W))
         
-        # Ensure task_frame expands with main_frame
         self.task_frame.grid_columnconfigure(0, weight=1)
         self.task_frame.grid_rowconfigure(0, weight=1)
 
-        self.tree.bind("<Double-1>", self.edit_task)
+        self.tree.bind("<Double-1>", self.edit_task)  
+
+    def update_task_index_display(self, item, is_playing=False):
+        """动态更新任务序号列，添加或移除播放符号"""
+        if not item:
+            return
+        values = list(self.tree.item(item)["values"])
+        original_index = values[0]  # 保存原始序号
+        if is_playing:
+            # 在播放时添加播放符号
+            self.tree.set(item, "序号", f"▶ {original_index}")
+        else:
+            # 停止或暂停时恢复原始序号
+            self.tree.set(item, "序号", str(original_index))
+
 
     def toggle_playback(self, event=None):
         """Toggle playback state of the selected or currently playing task."""
@@ -193,11 +207,13 @@ class AudioPlayer:
                 pygame.mixer.music.unpause()
                 self.paused = False
                 self.update_task_status(item, "正在播放", 'playing')
+                self.update_task_index_display(item, is_playing=True)  # 添加播放符号
                 self.play_buttons_ref["播放/暂停"].config(text="⏸ 暂停")
             else:
                 pygame.mixer.music.pause()
                 self.paused = True
                 self.update_task_status(item, "已暂停", 'paused')
+                self.update_task_index_display(item, is_playing=False)  # 移除播放符号
                 self.play_buttons_ref["播放/暂停"].config(text="▶ 继续")
         else:
             self.stop_task()
@@ -277,63 +293,70 @@ class AudioPlayer:
     def load_tasks(self):
         tasks = load_tasks()
         total_tasks = 0
+        now = datetime.datetime.now()
+        current_time = now.time()
+        current_date = now.strftime("%Y-%m-%d")
+        current_weekday = ["一", "二", "三", "四", "五", "六", "日"][now.weekday()]
         for task in tasks:
-            self._add_task_to_tree(task)
+            self._add_task_to_tree(task, current_time, current_date, current_weekday)
             total_tasks = len(self.tree.get_children())
         self.status_label.config(text=f"已加载 {total_tasks} 个任务")
-        self.check_tasks()
+        # self.check_tasks() # 启动时不再检查任务状态，而是在_add_task_to_tree中判断
 
-    def _add_task_to_tree(self, task):
+    def _add_task_to_tree(self, task, current_time, current_date, current_weekday):
         """Add a task to the Treeview with appropriate styling."""
         try:
             if isinstance(task, dict):
-                values = [task.get('id', ''), task.get('name', ''), task.get('startTime', ''), task.get('endTime', ''), task.get('volume', ''), task.get('schedule', ''), task.get('audioPath', ''), task.get('status', '等待播放')]
+                values = [task.get('id', ''), task.get('name', ''), task.get('startTime', ''), task.get('endTime', ''), task.get('volume', ''), task.get('schedule', ''), task.get('audioPath', '')]
             else:
                 values = list(task)
-                if len(values) < 8:
-                    values.append('等待播放')
+            if len(values) < 7:
+                logging.warning(f"Task data incomplete: {task}")
+                return  # Skip incomplete tasks
+
             start_time_str = task.get('startTime', '') if isinstance(task, dict) else values[2]
             end_time_str = task.get('endTime', '') if isinstance(task, dict) else values[3]
             schedule_str = task.get('schedule', '') if isinstance(task, dict) else values[5]
+
+            status_text = "等待播放"  # Default status
             try:
-                start_time = datetime.datetime.strptime(start_time_str, "%H:%M:%S").time()
-                end_time = datetime.datetime.strptime(end_time_str, "%H:%M:%S").time()
+                start_time = datetime.datetime.strptime(current_date + " " + start_time_str, "%Y-%m-%d %H:%M:%S")
+                end_time = datetime.datetime.strptime(current_date + " " + end_time_str, "%Y-%m-%d %H:%M:%S")
                 now = datetime.datetime.now()
-                current_time = now.time()
-                current_date = now.strftime("%Y-%m-%d")
+
                 if "," in schedule_str:
                     weekdays = [day.strip() for day in schedule_str.split(",")]
-                    current_weekday = ["一", "二", "三", "四", "五", "六", "日"][now.weekday()]
                     if current_weekday in weekdays:
-                        if start_time <= current_time and current_time <= end_time:
-                            values[-1] = "正在播放"
-                        elif current_time > end_time:
-                            values[-1] = "已播放"
-                        else:
-                            values[-1] = "等待播放"
-                    else:
-                        values[-1] = "等待播放"
+                        if now > end_time:
+                            status_text = "已播放"
+                        elif start_time <= now and now <= end_time:
+                            status_text = "正在播放"
+                        elif now > start_time:
+                            status_text = "已播放"
                 else:
                     if schedule_str == current_date:
-                        if start_time <= current_time and current_time <= end_time:
-                            values[-1] = "正在播放"
-                        elif current_time >= end_time:
-                            values[-1] = "已播放"
-                        else:
-                            values[-1] = "等待播放"
-                    else:
-                        values[-1] = "等待播放"
+                        if now > end_time:
+                            status_text = "已播放"
+                        elif start_time <= now and now <= end_time:
+                            status_text = "正在播放"
+                        elif now > start_time:
+                            status_text = "已播放"
             except ValueError as e:
                 logging.warning(f"Invalid time format: {e}")
+
             if not os.path.exists(values[6]):
-                values[-1] = "文件丢失"
+                status_text = "文件丢失"
                 status_tag = 'error'
             else:
-                status_tag = 'playing' if values[-1] in ["已播放", "正在播放"] else 'waiting'
+                status_tag = 'playing' if status_text in ["已播放", "正在播放"] else 'waiting'
+
             # Add alternate row styling
             row_index = len(self.tree.get_children())
             row_tag = 'oddrow' if row_index % 2 else 'evenrow'
-            self.tree.insert("", "end", values=values, tags=(row_tag, status_tag))
+
+            # Insert the task into the tree with the determined status
+            self.tree.insert("", "end", values=values + [status_text], tags=(row_tag, status_tag))
+
         except Exception as e:
             logging.warning(f"Failed to add task: {e}")
 
@@ -364,31 +387,56 @@ class AudioPlayer:
             current_time = datetime.datetime.now()
             current_weekday = ["一", "二", "三", "四", "五", "六", "日"][current_time.weekday()]
             current_date = current_time.strftime("%Y-%m-%d")
+            new_task_to_play = None
+
             for item in self.tree.get_children():
                 values = self.tree.item(item)['values']
-                if len(values) < 8 or values[-1] in ["正在播放", "已播放"]:
+                if len(values) < 7:
                     continue
                 start_time_str = values[2]
+                end_time_str = values[3]
+                schedule_str = values[5]
+                audio_path = values[6]
+
                 try:
                     start_time = datetime.datetime.strptime(start_time_str, "%H:%M:%S").time()
+                    end_time = datetime.datetime.strptime(end_time_str, "%H:%M:%S").time()
                     now = current_time.time()
-                    if start_time <= now and values[-1] != "已播放":
-                        self.play_task(item)
-                        continue
-                except ValueError:
-                    logging.warning(f"Invalid start time format: {start_time_str}")
+
+                    # 计算时间差，允许 5 秒窗口内触发
+                    start_datetime = datetime.datetime.combine(datetime.date.today(), start_time)
+                    now_datetime = datetime.datetime.combine(datetime.date.today(), now)
+                    time_difference = (start_datetime - now_datetime).total_seconds()
+
+                    if 0 <= time_difference <= 1:  # 放宽到 5 秒窗口
+                        should_play = False
+                        if "," in schedule_str:
+                            weekdays = [day.strip() for day in schedule_str.split(",")]
+                            if current_weekday in weekdays and now <= end_time:
+                                should_play = True
+                        elif schedule_str == current_date and now <= end_time:
+                            should_play = True
+
+                        if should_play:
+                            # 如果已经有任务在播放，停止它
+                            if self.current_playing_sound and item != self.current_playing_item:
+                                self.stop_task()
+                            # 标记新任务为待播放
+                            new_task_to_play = item
+                            break  # 只播放一个新任务，避免同时触发多个
+
+                except ValueError as e:
+                    logging.warning(f"Invalid time format: {e}")
                     continue
-                if values[-1] == "已播放":
-                    continue
-                if self._should_play_task(values, current_time, current_weekday, current_date):
-                    if self.current_playing_sound:
-                        self.stop_task()
-                    self.play_task(item)
-                    break
+
+            # 如果有新任务需要播放，执行播放
+            if new_task_to_play and not self.current_playing_sound:
+                self.play_task(new_task_to_play)
+
         except Exception as e:
             logging.warning(f"Task check error: {e}")
         finally:
-            self.root.after(500, self.check_tasks)
+            self.root.after(100, self.check_tasks)  # 提高检查频率到 100ms
 
     def _should_play_task(self, values, current_time, current_weekday, current_date):
         try:
@@ -396,7 +444,10 @@ class AudioPlayer:
             task_date = values[5]
             task_time_obj = datetime.datetime.strptime(task_time, "%H:%M:%S").time()
             current_time_obj = current_time.time()
-            time_match = (task_time_obj.hour == current_time_obj.hour and task_time_obj.minute == current_time_obj.minute and task_time_obj.second == current_time_obj.second)
+            # 仅比较时分秒，忽略日期
+            time_match = (task_time_obj.hour == current_time_obj.hour and
+                          task_time_obj.minute == current_time_obj.minute and
+                          task_time_obj.second == current_time_obj.second)
             if not time_match:
                 return False
             if "," in task_date:
@@ -404,15 +455,7 @@ class AudioPlayer:
                 return current_weekday in weekdays
             else:
                 return task_date == current_date
-            logging.info(f"Task Check - Task: {values[1]}, Task Time: {task_time_obj}, Current Time: {current_time_obj}, Time Match: {time_match}, Date Match: {date_match}") # 添加日志
-            if not time_match:
-                return False
-            if "," in task_date:
-                weekdays = [day.strip() for day in task_date.split(",")]
-                return current_weekday in weekdays
-            else:
-                return task_date == current_date
-        except Exception as e:
+        except ValueError as e:
             logging.warning(f"Task validation error: {e}")
             return False
 
@@ -429,7 +472,7 @@ class AudioPlayer:
                 file_path = values[6]
                 volume = int(values[4])
             
-            # Only stop if switching to a new task
+            # 停止当前任务（如果有）
             if self.current_playing_sound and item != self.current_playing_item:
                 self.stop_task()
             
@@ -441,6 +484,8 @@ class AudioPlayer:
                 self.paused = False
                 pygame.mixer.music.play()
                 self.update_task_status(item, "正在播放", 'playing')
+                self.update_task_index_display(item, is_playing=True)  # 添加播放符号
+                self.status_label.config(text="正在播放")
                 self.play_buttons_ref["停止"].config(state="normal")
                 self.play_buttons_ref["播放/暂停"].config(text="⏸ 暂停")
                 self.stop_thread = False
@@ -451,6 +496,7 @@ class AudioPlayer:
             messagebox.showerror("错误", f"播放失败: {str(e)}")
             if item:
                 self.update_task_status(item, "播放失败", 'error')
+                self.update_task_index_display(item, is_playing=False)  # 移除播放符号
 
     def stop_task(self):
         if self.current_playing_sound:
@@ -458,16 +504,34 @@ class AudioPlayer:
             if self.playing_thread:
                 self.playing_thread.join()
             pygame.mixer.music.stop()
-            self.update_task_status(self.current_playing_item, "等待播放", 'waiting')
+            
+            if self.current_playing_item:
+                values = self.tree.item(self.current_playing_item)["values"]
+                start_time_str = values[2]
+                end_time_str = values[3]
+                current_date = datetime.datetime.now().strftime("%Y-%m-%d")
+                try:
+                    start_time = datetime.datetime.strptime(current_date + " " + start_time_str, "%Y-%m-%d %H:%M:%S")
+                    end_time = datetime.datetime.strptime(current_date + " " + end_time_str, "%Y-%m-%d %H:%M:%S")
+                    now = datetime.datetime.now()
+
+                    if now < start_time:
+                        status_text = "等待播放"
+                    elif now > end_time:
+                        status_text = "已播放"
+                    else:
+                        status_text = "等待播放"
+                    self.update_task_status(self.current_playing_item, status_text, 'waiting')
+                except ValueError as e:
+                    logging.warning(f"Invalid time format: {e}")
+                    self.update_task_status(self.current_playing_item, "等待播放", 'waiting')
+                self.update_task_index_display(self.current_playing_item, is_playing=False)  # 移除播放符号
+
             self.current_playing_sound = ""
             self.current_playing_item = None
             self.paused = False
             self.play_buttons_ref["停止"].config(state="disabled")
             self.play_buttons_ref["播放/暂停"].config(text="▶ 播放/暂停")
-            if self.current_time:
-                self.current_time.config(text="00:00")
-            if self.total_time:
-                self.total_time.config(text="/ 00:00")
             self.status_label.config(text="就绪")
 
     def pause_task(self):
@@ -502,15 +566,16 @@ class AudioPlayer:
             total_str = time.strftime('%M:%S', time.gmtime(self.current_playing_duration))
             if self.current_playing_item:
                 values = self.tree.item(self.current_playing_item)["values"]
-                self.status_label.config(text=f"当前播放文件：{values[1]} ({elapsed_str}/{total_str})")
+                self.status_label.config(text=f"当前播放任务：{values[1]} ({elapsed_str}/{total_str})")
         except Exception as e:
             logging.warning(f"UI update error: {e}")
 
     def _on_playback_complete(self):
         if self.current_playing_item:
             self.update_task_status(self.current_playing_item, "已播放", 'waiting')
-        
-        self.status_label.config(text="就绪")
+            self.status_label.config(text="就绪")
+            self.current_playing_sound = None
+            self.current_playing_item = None
 
     def update_task_status(self, item, status_text, status_tag):
         if item:
@@ -522,7 +587,13 @@ class AudioPlayer:
             tags = [tag for tag in tags if tag not in ['playing', 'paused', 'waiting', 'error']]
             tags.append(status_tag)
             self.tree.item(item, values=values, tags=tags)
-            self.status_label.config(text=f"当前任务：{values[1]} - {status_text}")
+            if status_text == "已暂停":
+                elapsed = pygame.mixer.music.get_pos() / 1000
+                elapsed_str = time.strftime('%M:%S', time.gmtime(elapsed))
+                total_str = time.strftime('%M:%S', time.gmtime(self.current_playing_duration))
+                self.status_label.config(text=f"当前任务：{values[1]} {elapsed_str}/{total_str} 已暂停")
+            else:
+                self.status_label.config(text=f"当前任务：{values[1]} - {status_text}")
 
     def add_task(self):
         default_end_time = "08:00:00"
@@ -654,15 +725,16 @@ class AudioPlayer:
         tasks = []
         for item in self.tree.get_children():
             values = list(self.tree.item(item)["values"])
+            # 移除播放符号，只保存原始序号
+            original_index = str(values[0]).replace("▶ ", "").strip()
             task_data = {
-                "id": values[0],
+                "id": original_index,
                 "name": values[1],
                 "startTime": values[2],
                 "endTime": values[3],
                 "volume": values[4],
                 "schedule": values[5],
                 "audioPath": values[6],
-                "status": values[7] if len(values) > 7 else "waiting"
             }
             tasks.append(task_data)
         if save_all_tasks(tasks):
