@@ -1,38 +1,29 @@
 [
     {
         "id": "1",
-        "name": "测试一",
-        "startTime": "12:25:00",
-        "endTime": "12:25:18",
+        "name": 122,
+        "startTime": "13:19:21",
+        "endTime": "13:24:20",
         "volume": 100,
         "schedule": "2025-03-03",
-        "audioPath": "D:/数字自动广播系统/备份/校园广播歌曲/15分钟提示.mp3"
+        "audioPath": "E:/mp3/周杰伦 - 发如雪.mp3"
     },
     {
         "id": "2",
-        "name": "啊手动阀",
-        "startTime": "12:25:18",
-        "endTime": "12:25:20",
+        "name": 12,
+        "startTime": "13:22:10",
+        "endTime": "13:26:26",
         "volume": 100,
         "schedule": "2025-03-03",
-        "audioPath": "D:/数字自动广播系统/备份/校园广播歌曲/分发试卷.mp3"
+        "audioPath": "E:/mp3/温奕心 - 一路生花.mp3"
     },
     {
         "id": "3",
-        "name": "wav",
-        "startTime": "12:25:42",
-        "endTime": "12:26:00",
+        "name": "撒打发",
+        "startTime": "13:25:56",
+        "endTime": "13:30:12",
         "volume": 100,
-        "schedule": "一, 二, 三, 四, 五",
-        "audioPath": "D:/数字自动广播系统/备份/校园广播歌曲/长音.wav"
-    },
-    {
-        "id": "4",
-        "name": "qf",
-        "startTime": "12:26:18",
-        "endTime": "12:26:21",
-        "volume": 100,
-        "schedule": "二, 三, 四, 五",
-        "audioPath": "D:/数字自动广播系统/备份/校园广播歌曲/启封试卷.mp3"
+        "schedule": "2025-03-03",
+        "audioPath": "E:/mp3/温奕心 - 一路生花.mp3"
     }
 ]

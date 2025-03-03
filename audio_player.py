@@ -37,6 +37,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 class AudioPlayer:
     def __init__(self):
+        self.lock = threading.Lock()
         self.setup_root_window()
         self.init_variables()
         self.setup_styles()
@@ -273,7 +274,7 @@ class AudioPlayer:
         controls_main_frame = tk.Frame(self.control_frame, bg=BACKGROUND_COLOR)
         controls_main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E))
         self.control_frame.grid_columnconfigure(0, weight=1)
-        
+
         # Use grid for even spacing
         left_buttons_frame = tk.Frame(controls_main_frame, bg=BACKGROUND_COLOR)
         left_buttons_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 20))
@@ -289,7 +290,7 @@ class AudioPlayer:
             btn.grid(row=i // 3, column=i % 3, padx=5, pady=5, sticky=(tk.W, tk.E))
             ToolTip(btn, tooltip)
         left_buttons_frame.grid_columnconfigure((0, 1, 2), weight=1)
-        
+
         center_buttons_frame = tk.Frame(controls_main_frame, bg=BACKGROUND_COLOR)
         center_buttons_frame.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=20)
         play_buttons = [
@@ -297,13 +298,17 @@ class AudioPlayer:
             ("停止", "⏹", self.stop_task, "停止播放 (Ctrl+S)"),
         ]
         self.play_buttons_ref = {}
+        self.play_buttons_ref["播放/暂停"] = ttk.Button(center_buttons_frame, text="▶ 播放/暂停", command=self.toggle_playback, style="Custom.TButton")
         for i, (text, icon, command, tooltip) in enumerate(play_buttons):
-            btn = ttk.Button(center_buttons_frame, text=f"{icon} {text}", command=command, style="Custom.TButton")
+            if text == "播放/暂停":
+                btn = self.play_buttons_ref["播放/暂停"]
+            else:
+                btn = ttk.Button(center_buttons_frame, text=f"{icon} {text}", command=command, style="Custom.TButton")
             btn.grid(row=0, column=i, padx=5, pady=5, sticky=(tk.W, tk.E))
             self.play_buttons_ref[text] = btn
             ToolTip(btn, tooltip)
         center_buttons_frame.grid_columnconfigure((0, 1), weight=1)
-        
+
         right_buttons_frame = tk.Frame(controls_main_frame, bg=BACKGROUND_COLOR)
         right_buttons_frame.grid(row=0, column=2, sticky=(tk.W, tk.E))
         right_buttons = [
@@ -316,7 +321,7 @@ class AudioPlayer:
             btn.grid(row=i, column=0, padx=5, pady=5, sticky=(tk.W, tk.E))
             ToolTip(btn, tooltip)
         right_buttons_frame.grid_columnconfigure(0, weight=1)
-        
+
         controls_main_frame.grid_columnconfigure((0, 1, 2), weight=1)
 
     def sync_time(self):
@@ -482,9 +487,57 @@ class AudioPlayer:
             current_date = now.strftime("%Y-%m-%d")
             current_weekday = ["一", "二", "三", "四", "五", "六", "日"][now.weekday()]
 
-            # 如果当前有任务在播放且未暂停，跳过检查
+            # 如果当前有任务在播放且未暂停，检查是否有时间到达的下一个任务
             if self.current_playing_sound and not self.paused:
-                return
+                now = datetime.datetime.now()
+                current_time = now.time()
+                current_date = now.strftime("%Y-%m-%d")
+                current_weekday = ["一", "二", "三", "四", "五", "六", "日"][now.weekday()]
+                for item in self.tree.get_children():
+                    values = self.tree.item(item)['values']
+                    if len(values) < 7 or values[-1] in ["正在播放", "已暂停"]:
+                        continue
+
+                    if self.manual_stop and item == self.current_playing_item:
+                        continue
+
+                    start_time_str, schedule_str, audio_path = values[2], values[5], values[6]
+                    if not os.path.exists(audio_path):
+                        self.update_task_status(item, "文件丢失", 'error')
+                        continue
+
+                    try:
+                        start_time = datetime.datetime.strptime(start_time_str, "%H:%M:%S").time()
+                        start_datetime = datetime.datetime.combine(now.date(), start_time)
+                        time_diff = abs((now - start_datetime).total_seconds())
+
+                        # 日期对比或星期对比
+                        date_match = False
+                        if "," in schedule_str:  # 星期对比
+                            weekdays = [day.strip() for day in schedule_str.split(",")]
+                            date_match = current_weekday in weekdays
+                        else:  # 日期对比
+                            date_match = schedule_str == current_date
+
+                        # 时间对比
+                        time_match = time_diff <= 1
+
+                        if date_match and time_match:
+                            if self.current_playing_item and self.current_playing_item != item:
+                                self.stop_task()
+                            if not self.current_playing_sound:
+                                # 获取当前播放任务的结束时间
+                                if self.current_playing_item:
+                                    current_item_values = self.tree.item(self.current_playing_item)['values']
+                                    current_item_end_time_str = current_item_values[3]
+                                    start_time_str = values[2]
+                                    if current_item_end_time_str == start_time_str:
+                                        time.sleep(0.5)  # 延迟 500ms
+                                self.play_task(item)
+
+                    except ValueError as e:
+                        logging.warning(f"Invalid time format in task {values[1]}: {e}")
+                        self.update_task_status(item, "时间格式错误", 'error')
 
             for item in self.tree.get_children():
                 values = self.tree.item(item)['values']
@@ -519,6 +572,13 @@ class AudioPlayer:
                         if self.current_playing_item and self.current_playing_item != item:
                             self.stop_task()
                         if not self.current_playing_sound:
+                            # 获取当前播放任务的结束时间
+                            if self.current_playing_item:
+                                current_item_values = self.tree.item(self.current_playing_item)['values']
+                                current_item_end_time_str = current_item_values[3]
+                                start_time_str = values[2]
+                                if current_item_end_time_str == start_time_str:
+                                    time.sleep(0.5)  # 延迟 500ms
                             self.play_task(item)
 
                 except ValueError as e:
@@ -560,6 +620,8 @@ class AudioPlayer:
     def play_task(self, item=None, file_path=None, volume=None):
         """播放选定的任务，改进状态管理和错误处理"""
         try:
+            pygame.init()
+            pygame.mixer.init()
             # 获取任务信息
             if not item and not file_path:
                 selected = self.tree.selection()
@@ -607,9 +669,9 @@ class AudioPlayer:
             if self.playing_thread and self.playing_thread.is_alive():
                 self.stop_thread = True
                 self.playing_thread.join()  # 确保旧线程结束
-            self.playing_thread = threading.Thread(target=self.update_play_progress, daemon=True)
+            self.playing_thread = threading.Thread(target=lambda: self.update_play_progress(self.lock), daemon=True)
             self.playing_thread.start()
-
+            
         except Exception as e:
             logging.error(f"播放任务失败: {e}")
             if item:
@@ -662,6 +724,7 @@ class AudioPlayer:
         except Exception as e:
             logging.error(f"停止任务失败: {e}")
             self.status_label.config(text="停止任务出错")
+            self.root.update()
     def pause_task(self):
         if self.current_playing_sound and not self.paused:
             pygame.mixer.music.pause()
@@ -670,18 +733,19 @@ class AudioPlayer:
             self.update_task_status(self.current_playing_item, "已暂停", 'paused')
             self.play_buttons_ref["播放/暂停"].config(text="▶ 继续")
 
-    def update_play_progress(self):
+    def update_play_progress(self, lock):
         """更新播放进度，优化线程退出和UI刷新"""
         try:
             while not self.stop_thread and self.current_playing_sound:
-                if pygame.mixer.music.get_busy() and not self.paused:
-                    current_position = pygame.mixer.music.get_pos() / 1000  # 转换为秒
-                    progress = min((current_position / self.current_playing_duration) * 100, 100)
-                    self.root.after(0, self._update_progress_ui, current_position, progress)
-                elif not pygame.mixer.music.get_busy() and not self.paused:
-                    # 播放自然结束
-                    self.root.after(0, self._on_playback_complete)
-                    break
+                with lock:
+                    if pygame.mixer.music.get_busy() and not self.paused:
+                        current_position = pygame.mixer.music.get_pos() / 1000  # 转换为秒
+                        progress = min((current_position / self.current_playing_duration) * 100, 100)
+                        self.root.after(0, self._update_progress_ui, current_position, progress)
+                    elif not pygame.mixer.music.get_busy() and not self.paused:
+                        # 播放自然结束
+                        self.root.after(0, self._on_playback_complete)
+                        break
                 time.sleep(0.5)  # 降低刷新频率到 0.5 秒
         except Exception as e:
             logging.error(f"播放进度更新失败: {e}")
