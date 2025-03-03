@@ -259,9 +259,10 @@ class AudioPlayer:
                     self.update_task_status(item, "已暂停", 'paused')
                     self.update_task_index_display(item, is_playing=False)
                     self.play_buttons_ref["播放/暂停"].config(text="▶ 继续")
-            else:  # 选择了其他任务，停止当前任务并播放新任务
-                self.stop_task()
-                self.play_task(item)
+            else:  # 选择了其他任务
+                if not self.paused: # 如果当前是暂停状态，则不播放新任务
+                    self.stop_task()
+                    self.play_task(item)
 
         except Exception as e:
             logging.error(f"切换播放状态失败: {e}")

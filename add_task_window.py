@@ -10,7 +10,6 @@ from constants import TASK_FILE_PATH, TITLE_FONT, NORMAL_FONT, PRIMARY_COLOR, SE
 class AddTaskWindow:
     def __init__(self, player, task_data=None, selected_item=None, default_time="08:00:00"):
         import logging
-        logging.info("开始构造 AddTaskWindow")
         self.player = player
         self.selected_item = selected_item
         self.default_time = default_time
@@ -18,12 +17,9 @@ class AddTaskWindow:
         self.preview_sound = None
         try:
             self.setup_window()
-            logging.info("setup_window 完成")
             self.setup_ui(task_data)
-            logging.info("setup_ui 完成")
             if task_data:
                 self.load_task_data(task_data)
-                logging.info("load_task_data 完成")
         except Exception as e:
             logging.error(f"AddTaskWindow 构造失败: {e}")
             raise  # 抛出异常以便捕获
@@ -456,7 +452,7 @@ class AddTaskWindow:
                 task_data[3],  # 音量
                 task_data[4],  # 播放日期/星期
                 task_data[5],  # 文件路径
-                "waiting"      # 默认状态
+                "创建任务"      # 默认状态
             ]
             
             # 更新或插入 Treeview
