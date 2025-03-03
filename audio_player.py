@@ -116,6 +116,7 @@ class AudioPlayer:
         self.total_time = None
         # 添加任务计数器，避免重复计算
         self.task_count = 0
+        self.manual_stop = False
 
     def on_window_close(self):
         """窗口关闭时保存任务"""
@@ -398,13 +399,13 @@ class AudioPlayer:
                         task.get('audioPath', ''), task.get('status', 'waiting')]
             else:
                 values = list(task) + ["waiting"] if len(task) < 8 else list(task)
-            
+
             if len(values) < 8:
                 logging.warning(f"任务数据不完整: {task}")
                 return
-            
+
             start_time_str, end_time_str, schedule_str, audio_path = values[2], values[3], values[5], values[6]
-            
+
             # 检查文件是否存在
             if not os.path.exists(audio_path):
                 values[-1] = "文件丢失"
@@ -417,39 +418,45 @@ class AudioPlayer:
                     current_datetime = datetime.datetime.combine(now.date(), current_time)
                     start_datetime = datetime.datetime.combine(now.date(), start_time)
                     end_datetime = datetime.datetime.combine(now.date(), end_time)
-                    
+
                     if "," in schedule_str:
                         weekdays = [day.strip() for day in schedule_str.split(",")]
                         scheduled_today = current_weekday in weekdays
                     else:
                         scheduled_today = schedule_str == current_date
-                    
+
                     if not scheduled_today:
                         values[-1] = "等待播放"
                     elif current_datetime < start_datetime:
                         values[-1] = "等待播放"
                     elif start_datetime <= current_datetime <= end_datetime:
-                        values[-1] = "正在播放" if values[-1] == "正在播放" else "等待播放"
+                        # 确保初始状态为等待播放，除非任务之前被设置为正在播放
+                        if values[-1] != "正在播放":
+                            values[-1] = "等待播放"
                     else:
                         values[-1] = "已播放"
-                    
+
                     status_tag = 'playing' if values[-1] == "正在播放" else 'waiting'
                     if values[-1] == "已播放":
                         status_tag = 'waiting'  # 已播放的任务显示为等待风格
-                        
+
                 except ValueError as e:
                     logging.warning(f"时间格式错误: {e}")
                     values[-1] = "时间格式错误"
                     status_tag = 'error'
-            
+
             # 添加行样式
             row_index = len(self.tree.get_children())
             row_tag = 'oddrow' if row_index % 2 else 'evenrow'
-            self.tree.insert("", "end", values=values, tags=(row_tag, status_tag))
-            
+            # 只有当任务状态为 "正在播放" 且当前没有任务在播放时，才播放任务
+            if values[-1] == "正在播放" and not self.current_playing_sound:
+                new_item = self.tree.insert("", "end", values=values, tags=(row_tag, status_tag))
+                self.play_task(item=new_item)
+            else:
+                self.tree.insert("", "end", values=values, tags=(row_tag, status_tag))
+
         except Exception as e:
             logging.error(f"添加任务失败: {e}")
-
     def start_periodic_checks(self):
         """启动定期检查，优化事件调度"""
         self.root.after(0, self.update_time)  # 立即启动时间更新
@@ -474,52 +481,50 @@ class AudioPlayer:
             current_time = now.time()
             current_date = now.strftime("%Y-%m-%d")
             current_weekday = ["一", "二", "三", "四", "五", "六", "日"][now.weekday()]
-            
+
             # 如果当前有任务在播放且未暂停，跳过检查
             if self.current_playing_sound and not self.paused:
                 return
-            
-            playable_tasks = []
+
             for item in self.tree.get_children():
                 values = self.tree.item(item)['values']
                 if len(values) < 7 or values[-1] in ["正在播放", "已暂停"]:
                     continue
-                    
-                start_time_str, end_time_str, schedule_str, audio_path = values[2], values[3], values[5], values[6]
+
+                if self.manual_stop and item == self.current_playing_item:
+                    continue
+
+                start_time_str, schedule_str, audio_path = values[2], values[5], values[6]
                 if not os.path.exists(audio_path):
                     self.update_task_status(item, "文件丢失", 'error')
                     continue
 
                 try:
                     start_time = datetime.datetime.strptime(start_time_str, "%H:%M:%S").time()
-                    end_time = datetime.datetime.strptime(end_time_str, "%H:%M:%S").time()
-                    
-                    should_play = False
-                    if "," in schedule_str:
-                        weekdays = [day.strip() for day in schedule_str.split(",")]
-                        if current_weekday in weekdays and start_time <= current_time <= end_time:
-                            should_play = True
-                    elif schedule_str == current_date and start_time <= current_time <= end_time:
-                        should_play = True
-                    
                     start_datetime = datetime.datetime.combine(now.date(), start_time)
-                    time_diff = (now - start_datetime).total_seconds()
-                    if should_play or (0 <= time_diff <= 5 and self._is_scheduled_today(schedule_str, current_date, current_weekday)):
-                        playable_tasks.append((item, start_time_str))
-                        
+                    time_diff = abs((now - start_datetime).total_seconds())
+
+                    # 日期对比或星期对比
+                    date_match = False
+                    if "," in schedule_str:  # 星期对比
+                        weekdays = [day.strip() for day in schedule_str.split(",")]
+                        date_match = current_weekday in weekdays
+                    else:  # 日期对比
+                        date_match = schedule_str == current_date
+
+                    # 时间对比
+                    time_match = time_diff <= 1
+
+                    if date_match and time_match:
+                        if self.current_playing_item and self.current_playing_item != item:
+                            self.stop_task()
+                        if not self.current_playing_sound:
+                            self.play_task(item)
+
                 except ValueError as e:
                     logging.warning(f"Invalid time format in task {values[1]}: {e}")
                     self.update_task_status(item, "时间格式错误", 'error')
-            
-            # 如果有多个可播放任务，选择第一个（按开始时间和 Treeview 顺序）
-            if playable_tasks:
-                # 按 Treeview 顺序优先（假设用户希望列表顶部任务优先）
-                selected_item = playable_tasks[0][0]
-                if self.current_playing_item and self.current_playing_item != selected_item:
-                    self.stop_task()
-                if not self.current_playing_sound:
-                    self.play_task(selected_item)
-                    
+
         except Exception as e:
             logging.error(f"Task check failed: {e}")
         finally:
@@ -582,7 +587,8 @@ class AudioPlayer:
             success, duration = safe_play_audio(file_path, volume)
             if not success:
                 raise Exception("音频加载失败")
-            
+
+            self.manual_stop = False
             self.current_playing_sound = file_path
             self.current_playing_item = item
             self.current_playing_duration = duration
@@ -617,6 +623,8 @@ class AudioPlayer:
             return  # 无任务播放时直接返回
 
         try:
+            # 设置手动停止标志
+            self.manual_stop = True
             # 停止播放和线程
             self.stop_thread = True
             pygame.mixer.music.stop()
@@ -629,14 +637,15 @@ class AudioPlayer:
                 start_time_str, end_time_str = values[2], values[3]
                 current_date = datetime.datetime.now().strftime("%Y-%m-%d")
                 now = datetime.datetime.now()
-                
                 try:
                     start_time = datetime.datetime.strptime(f"{current_date} {start_time_str}", "%Y-%m-%d %H:%M:%S")
                     end_time = datetime.datetime.strptime(f"{current_date} {end_time_str}", "%Y-%m-%d %H:%M:%S")
                     status_text = "等待播放" if now < end_time else "已播放"
+                    self.manual_stop = False # 重置手动停止标志
                 except ValueError as e:
                     logging.warning(f"时间解析错误: {e}")
                     status_text = "等待播放"
+                    self.manual_stop = False # 即使解析错误，也重置标志，防止影响后续任务
                 
                 self.update_task_status(self.current_playing_item, status_text, 'waiting')
                 self.update_task_index_display(self.current_playing_item, is_playing=False)

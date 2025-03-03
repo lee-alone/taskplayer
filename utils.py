@@ -9,12 +9,13 @@ def safe_play_audio(file_path, volume=100):
         if not os.path.exists(file_path):
             raise FileNotFoundError("音频文件不存在")
 
-        sound = pygame.mixer.Sound(file_path)
-        duration = sound.get_length()
         pygame.mixer.music.load(file_path)
         pygame.mixer.music.set_volume(volume / 100)
         pygame.mixer.music.play()
 
+        # 获取音频时长
+        sound = pygame.mixer.Sound(file_path)
+        duration = sound.get_length()
         return True, duration
 
     except Exception as e:
