@@ -19,6 +19,7 @@ class ToolTip:
         self.tip = None
         self.widget.bind("<Enter>", self.show_tip)
         self.widget.bind("<Leave>", self.hide_tip)
+
     
     def show_tip(self, event):
         x, y = self.widget.winfo_pointerxy()
@@ -43,7 +44,49 @@ class AudioPlayer:
         self.setup_components()
         self.load_tasks()
         self.start_periodic_checks()
+        self.setup_shortcuts()  # 添加快捷键设置
 
+    def setup_shortcuts(self):
+        """设置快捷键绑定"""
+        # 播放/暂停 (Ctrl+P)
+        self.root.bind("<Control-p>", self.toggle_playback)
+        ToolTip(self.play_buttons_ref["播放/暂停"], "播放或暂停当前任务 (Ctrl+P)")
+
+        # 停止 (Ctrl+S)
+        self.root.bind("<Control-s>", self.stop_task)
+        ToolTip(self.play_buttons_ref["停止"], "停止播放 (Ctrl+S)")
+
+        # 新增任务 (Ctrl+N)
+        self.root.bind("<Control-n>", lambda e: self.add_task())
+
+        # 编辑任务 (Ctrl+E)
+        self.root.bind("<Control-e>", self.edit_task)
+
+        # 删除任务 (Ctrl+D)
+        self.root.bind("<Control-d>", lambda e: self.delete_task())
+
+        # 复制任务 (Ctrl+C)
+        self.root.bind("<Control-c>", lambda e: self.copy_task())
+
+        # 上移任务 (Ctrl+Up)
+        self.root.bind_all("<Control-Key-Up>", lambda e: [self.tree.focus_set(), self._move_task(-1), self.root.focus_force()])
+        ToolTip(self.tree, "上移选中任务 (Ctrl+Up)")
+
+        # 下移任务 (Ctrl+Down)
+        self.root.bind_all("<Control-Key-Down>", lambda e: [self.tree.focus_set(), self._move_task(1), self.root.focus_force()])
+        ToolTip(self.tree, "下移选中任务 (Ctrl+Down)")
+
+        # 同步时间 (Ctrl+T)
+        self.root.bind_all("<Control-t>", lambda e: self.sync_time())
+
+        # 导入任务 (Ctrl+I)
+        self.root.bind("<Control-i>", lambda e: self.import_tasks())
+
+        # 导出任务 (Ctrl+O)
+        self.root.bind("<Control-o>", lambda e: self.export_tasks())
+
+        # 聚焦 Treeview (Ctrl+L)
+        self.root.bind("<Control-l>", lambda e: self.tree.focus_set())
     def setup_root_window(self):
         self.root = tk.Tk()
         self.root.title("任务播放器")
@@ -57,7 +100,7 @@ class AudioPlayer:
         self.root.grid_columnconfigure(0, weight=1)
         self.main_frame = ttk.Frame(self.root)
         self.main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=10, pady=10)
-
+        self.root.focus_force()  # 启动时强制焦点到主窗口
     def init_variables(self):
         """初始化变量，优化资源管理"""
         pygame.init()
@@ -170,6 +213,9 @@ class AudioPlayer:
         # 优化绑定，使用更具体的事件
         self.tree.bind("<Double-1>", self.edit_task)
         self.tree.bind("<<TreeviewSelect>>", self.on_select)
+        # 仅禁用普通上下键，明确允许 Control 修饰键通过
+        self.tree.bind("<Up>", lambda e: "break")
+        self.tree.bind("<Down>", lambda e: "break")
 
     def update_task_index_display(self, item, is_playing=False):
         """动态更新任务序号列，简化符号管理"""
@@ -231,11 +277,11 @@ class AudioPlayer:
         left_buttons_frame = tk.Frame(controls_main_frame, bg=BACKGROUND_COLOR)
         left_buttons_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 20))
         left_buttons = [
-            ("新增任务", "🆕", self.add_task, "添加新任务"),
-            ("删除任务", "❌", self.delete_task, "删除选中任务"),
-            ("复制任务", "📋", self.copy_task, "复制选中任务"),
-            ("导入任务", "📥", self.import_tasks, "从文件导入任务"),
-            ("导出任务", "📤", self.export_tasks, "导出任务到文件"),
+            ("新增任务", "🆕", self.add_task, "添加新任务 (Ctrl+N)"),
+            ("删除任务", "❌", self.delete_task, "删除选中任务 (Ctrl+D)"),
+            ("复制任务", "📋", self.copy_task, "复制选中任务 (Ctrl+C)"),
+            ("导入任务", "📥", self.import_tasks, "从文件导入任务 (Ctrl+I)"),
+            ("导出任务", "📤", self.export_tasks, "导出任务到文件 (Ctrl+O)"),
         ]
         for i, (text, icon, command, tooltip) in enumerate(left_buttons):
             btn = ttk.Button(left_buttons_frame, text=f"{icon} {text}", command=command, style="Custom.TButton")
@@ -246,8 +292,8 @@ class AudioPlayer:
         center_buttons_frame = tk.Frame(controls_main_frame, bg=BACKGROUND_COLOR)
         center_buttons_frame.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=20)
         play_buttons = [
-            ("播放/暂停", "▶", self.toggle_playback, "播放或暂停当前任务"),
-            ("停止", "⏹", self.stop_task, "停止播放"),
+            ("播放/暂停", "▶", self.toggle_playback, "播放或暂停当前任务 (Ctrl+P)"),
+            ("停止", "⏹", self.stop_task, "停止播放 (Ctrl+S)"),
         ]
         self.play_buttons_ref = {}
         for i, (text, icon, command, tooltip) in enumerate(play_buttons):
@@ -260,9 +306,9 @@ class AudioPlayer:
         right_buttons_frame = tk.Frame(controls_main_frame, bg=BACKGROUND_COLOR)
         right_buttons_frame.grid(row=0, column=2, sticky=(tk.W, tk.E))
         right_buttons = [
-            ("上移任务", "⬆", self.move_task_up, "上移选中任务"),
-            ("同步时间", "🕒", self.sync_time, "同步系统时间"),
-            ("下移任务", "⬇", self.move_task_down, "下移选中任务"),
+            ("上移任务", "⬆", self.move_task_up, "上移选中任务 (Ctrl+Up)"),
+            ("同步时间", "🕒", self.sync_time, "同步系统时间 (Ctrl+T)"),
+            ("下移任务", "⬇", self.move_task_down, "下移选中任务 (Ctrl+Down)"),
         ]
         for i, (text, icon, command, tooltip) in enumerate(right_buttons):
             btn = ttk.Button(right_buttons_frame, text=f"{icon} {text}", command=command, style="Custom.TButton")
@@ -712,15 +758,17 @@ class AudioPlayer:
                 # 在 self.window 上绑定销毁回调
                 self.add_task_window.window.protocol("WM_DELETE_WINDOW", self.on_add_task_window_close)
             else:
-                self.add_task_window.window.lift()
-                self.add_task_window.window.focus_force()
+                # 重置窗口状态，而不是直接复用
+                self.add_task_window.on_closing()  # 关闭现有窗口
+                self.add_task_window = AddTaskWindow(self, default_time=default_end_time)
+                self.add_task_window.window.protocol("WM_DELETE_WINDOW", self.on_add_task_window_close)
         
         except Exception as e:
             logging.error(f"添加任务窗口打开失败: {e}")
             messagebox.showerror("错误", f"无法打开添加任务窗口: {str(e)}")
 
-    def edit_task(self, event):
-        """编辑选定任务，优化窗口管理和数据传递"""
+    def edit_task(self, event=None):
+        """编辑选定任务，优化窗口管理和数据传递，支持快捷键调用"""
         try:
             selected = self.tree.selection()
             if not selected:
@@ -741,7 +789,7 @@ class AudioPlayer:
                 self.add_task_window.window.lift()
                 self.add_task_window.window.focus_force()
                 if hasattr(self.add_task_window, 'load_task_data'):
-                    self.add_task_window.load_task_data(task_data, item)
+                    self.add_task_window.load_task_data(task_data)
         
         except Exception as e:
             logging.error(f"编辑任务窗口打开失败: {e}")

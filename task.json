@@ -2,37 +2,28 @@
     {
         "id": "1",
         "name": 1,
-        "startTime": "19:42:00",
-        "endTime": "19:46:58",
+        "startTime": "10:15:00",
+        "endTime": "10:19:51",
         "volume": 100,
-        "schedule": "2025-03-01",
-        "audioPath": "D:/mp3/cd1/105.特別的愛給特別的你 - 伍思凱.mp3"
+        "schedule": "一, 二, 三, 四, 五",
+        "audioPath": "C:/Users/lel99/Desktop/mp3/Beyond－长城.mp3"
     },
     {
         "id": "2",
-        "name": "1 - 副本",
-        "startTime": "19:42:00",
-        "endTime": "19:46:58",
+        "name": 2,
+        "startTime": "10:24:00",
+        "endTime": "10:29:04",
         "volume": 100,
-        "schedule": "2025-03-01",
-        "audioPath": "D:/mp3/cd1/105.特別的愛給特別的你 - 伍思凱.mp3"
+        "schedule": "一, 二, 三, 四, 五",
+        "audioPath": "C:/Users/lel99/Desktop/mp3/爱的代价-张艾嘉.mp3"
     },
     {
         "id": "3",
-        "name": "一场游戏一场梦",
-        "startTime": "20:12:58",
-        "endTime": "20:17:16",
+        "name": 3,
+        "startTime": "10:29:04",
+        "endTime": "10:32:47",
         "volume": 100,
-        "schedule": "2025-03-01",
-        "audioPath": "D:/mp3/cd1/102.一場遊戲一場夢 - 王傑.mp3"
-    },
-    {
-        "id": "0",
-        "name": "一次爱个够",
-        "startTime": "20:17:16",
-        "endTime": "20:21:36",
-        "volume": 100,
-        "schedule": "2025-03-01",
-        "audioPath": "D:/mp3/cd4/405.讓我一次愛個夠 - 庾澄慶.mp3"
+        "schedule": "2025-03-03",
+        "audioPath": "C:/Users/lel99/Desktop/mp3/周杰伦 - 稻香.mp3"
     }
 ]
