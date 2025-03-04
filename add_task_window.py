@@ -442,10 +442,11 @@ class AddTaskWindow:
         ]
 
     def save_task_data(self, task_data, selected_item=None):
+        """保存任务数据，维护内存中的 task_id_map 并触发排序"""
         try:
-            # 构造任务数据
+            # 构造任务数据，ID 暂时设为 0，等待排序后分配
             new_task = [
-                "0",           # 临时 ID，稍后由主程序更新
+                "0",           # 临时 ID，后续由 save_all_tasks 重新分配
                 task_data[0],  # 任务名称
                 task_data[1],  # 开始时间
                 task_data[2],  # 结束时间
@@ -458,10 +459,12 @@ class AddTaskWindow:
             # 更新或插入 Treeview
             if selected_item:
                 self.player.tree.item(selected_item, values=new_task)
+                # 保留现有 ID，等待重新排序
             else:
-                self.player.tree.insert("", "end", values=new_task)
+                new_item = self.player.tree.insert("", "end", values=new_task)
+                self.player.task_id_map[new_item] = "0"  # 临时 ID
             
-            # 调用主程序的保存方法
+            # 调用主程序的保存方法以排序和重新分配 ID
             self.player.save_all_tasks()
         
         except Exception as e:

@@ -1,38 +1,29 @@
 [
     {
         "id": "1",
-        "name": 122,
-        "startTime": "13:52:00",
-        "endTime": "13:56:59",
+        "name": "测试",
+        "startTime": "10:29:35",
+        "endTime": "10:33:51",
         "volume": 100,
-        "schedule": "2025-03-03",
-        "audioPath": "E:/mp3/周杰伦 - 发如雪.mp3"
+        "schedule": "2025-03-04",
+        "audioPath": "E:/mp3/温奕心 - 一路生花.mp3"
     },
     {
         "id": "2",
-        "name": 12,
-        "startTime": "13:53:10",
-        "endTime": "13:57:26",
+        "name": 3234,
+        "startTime": "10:31:49",
+        "endTime": "10:36:48",
         "volume": 100,
-        "schedule": "2025-03-03",
-        "audioPath": "E:/mp3/温奕心 - 一路生花.mp3"
+        "schedule": "2025-03-04",
+        "audioPath": "E:/mp3/周杰伦 - 发如雪.mp3"
     },
     {
         "id": "3",
-        "name": "撒打发",
-        "startTime": "13:54:00",
-        "endTime": "13:58:16",
+        "name": "开会",
+        "startTime": "10:33:32",
+        "endTime": "10:37:48",
         "volume": 100,
-        "schedule": "2025-03-03",
-        "audioPath": "E:/mp3/温奕心 - 一路生花.mp3"
-    },
-    {
-        "id": "4",
-        "name": "撒打发",
-        "startTime": "14:08:19",
-        "endTime": "14:12:35",
-        "volume": 100,
-        "schedule": "2025-03-03",
+        "schedule": "一, 二, 三, 四, 五, 六, 日",
         "audioPath": "E:/mp3/温奕心 - 一路生花.mp3"
     }
 ]
