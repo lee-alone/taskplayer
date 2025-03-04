@@ -9,7 +9,7 @@ import pygame
 import logging
 from constants import TASK_FILE_PATH, ICON_PATH, DEFAULT_WINDOW_SIZE, MIN_WINDOW_SIZE, TITLE_FONT, NORMAL_FONT, PRIMARY_COLOR, SECONDARY_COLOR, BACKGROUND_COLOR
 from add_task_window import AddTaskWindow
-from utils import safe_play_audio, update_task_in_json, load_tasks, save_all_tasks
+from utils import safe_play_audio, update_task_in_json, load_tasks, save_all_tasks, set_task_status
 
 class ToolTip:
     """A simple tooltip class for displaying hover hints."""
@@ -343,19 +343,40 @@ class AudioPlayer:
 
         controls_main_frame.grid_columnconfigure((0, 1, 2), weight=1)
 
-    def sync_time(self):
-        """同步系统时间，优化权限处理和反馈"""
+    def sync_time(self, event=None):
+        """同步系统时间，带权限检查"""
         try:
+            from admin_utils import is_admin, run_as_admin
+            import sys
+            
             self.status_label.config(text="正在同步时间...")
-            # 尝试以管理员权限运行时间同步命令
+            
+            if not is_admin():
+                response = messagebox.askyesno(
+                    "权限请求",
+                    "同步时间需要管理员权限。\n是否以管理员身份重新启动程序？"
+                )
+                
+                if response:
+                    # 保存当前任务状态
+                    self.save_all_tasks()
+                    # 以管理员权限重启程序
+                    success = run_as_admin(sys.argv[0])
+                    if success:
+                        self.root.destroy()  # 关闭当前实例
+                    else:
+                        messagebox.showerror("错误", "无法获取管理员权限")
+                    return
+                else:
+                    self.status_label.config(text="时间同步已取消")
+                    return
+            
+            # 已有管理员权限，执行同步
             result = os.system("w32tm /resync")
             
             if result == 0:
                 self.status_label.config(text="时间同步成功")
                 messagebox.showinfo("提示", "系统时间已成功同步")
-            elif result == 1314:  # 权限不足
-                self.status_label.config(text="时间同步失败")
-                messagebox.showerror("错误", "时间同步失败：需要管理员权限\n请以管理员身份运行程序")
             else:
                 self.status_label.config(text="时间同步失败")
                 messagebox.showerror("错误", f"时间同步失败，错误代码：{result}")
@@ -525,14 +546,11 @@ class AudioPlayer:
             row_tag = 'oddrow' if row_index % 2 else 'evenrow'
             new_item = self.tree.insert("", "end", values=values, tags=(row_tag, status_tag))
             self.task_id_map[new_item] = values[0]
-            
-            self.save_all_tasks()
-
-            if values[-1] == "正在播放" and not self.current_playing_sound:
-                self.play_task(item=new_item)
 
         except Exception as e:
             logging.error(f"添加任务失败: {e}")
+            pass
+
     def start_periodic_checks(self):
         """启动定期检查，优化事件调度"""
         self.root.after(0, self.update_time)  # 立即启动时间更新
@@ -813,16 +831,21 @@ class AudioPlayer:
         try:
             values = list(self.tree.item(item)["values"])
             tags = list(self.tree.item(item)["tags"])
-            
+
             # 更新状态值
             if len(values) < len(self.columns):
                 values.extend([""] * (len(self.columns) - len(values)))  # 补齐缺失的列
             values[-1] = status_text
-            
+
             # 更新标签，去除旧的状态标签并添加新的
-            status_tags = ['playing', 'paused', 'waiting', 'error']
+            status_tags = ['playing', 'paused', 'waiting', 'error', 'paused_today']
             tags = [tag for tag in tags if tag not in status_tags] + [status_tag]
             self.tree.item(item, values=values, tags=tags)
+
+            # 更新任务数据
+            task_id = self.task_id_map.get(item)
+            if task_id:
+                set_task_status(task_id, status_text)
 
             # 更新状态栏文本
             task_name = values[1]

@@ -72,7 +72,7 @@ class AddTaskWindow:
         radio_frame = ttk.Frame(date_frame)
         radio_frame.pack(fill=tk.X, padx=5, pady=5)
 
-        self.date_weekday_var = tk.IntVar()
+        self.date_weekday_var = tk.IntVar(value=1)
         rb_width = 20
         ttk.Radiobutton(radio_frame, text="单次日期", variable=self.date_weekday_var,
                        value=0, command=self.show_date, width=rb_width).pack(side=tk.LEFT, padx=10)
@@ -108,7 +108,7 @@ class AddTaskWindow:
                     pass
                 self.show_date()
         else:
-            self.show_date()
+            self.show_weekday()
 
     def setup_weekday_selection(self, parent, task_data):
         self.weekdays_frame = ttk.Frame(parent)
@@ -129,6 +129,8 @@ class AddTaskWindow:
             cb = ttk.Checkbutton(weekday_grid, text=day, variable=var)
             cb.grid(row=0, column=i, padx=5)
             self.weekday_vars.append(var)
+            if i < 5:  # 勾选工作日（周一到周五）
+                var.set(True)
 
         quick_select_frame = ttk.Frame(self.weekdays_frame)
         quick_select_frame.pack(fill=tk.X, pady=10)
@@ -455,7 +457,7 @@ class AddTaskWindow:
                 task_data[5],  # 文件路径
                 "创建任务"      # 默认状态
             ]
-            
+
             # 更新或插入 Treeview
             if selected_item:
                 self.player.tree.item(selected_item, values=new_task)
@@ -463,13 +465,14 @@ class AddTaskWindow:
             else:
                 new_item = self.player.tree.insert("", "end", values=new_task)
                 self.player.task_id_map[new_item] = "0"  # 临时 ID
-            
+
             # 调用主程序的保存方法以排序和重新分配 ID
             self.player.save_all_tasks()
-        
+            self.player.load_tasks()
+
         except Exception as e:
             raise Exception(f"保存任务数据失败: {str(e)}")
-    
+
     def update_task_status_in_tree(self, item, status_text):
         if item:
             values = list(self.player.tree.item(item)["values"])

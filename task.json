@@ -1,29 +1,82 @@
 [
     {
         "id": "1",
-        "name": "测试",
-        "startTime": "10:29:35",
-        "endTime": "10:33:51",
+        "name": "测试3 - 副本",
+        "startTime": "15:47:05",
+        "endTime": "15:52:09",
         "volume": 100,
         "schedule": "2025-03-04",
-        "audioPath": "E:/mp3/温奕心 - 一路生花.mp3"
+        "audioPath": "C:/Users/lel99/Desktop/mp3/爱的代价-张艾嘉.mp3",
+        "status": "已播放"
     },
     {
         "id": "2",
-        "name": 3234,
-        "startTime": "10:31:49",
-        "endTime": "10:36:48",
+        "name": "测试2",
+        "startTime": "16:05:30",
+        "endTime": "16:10:29",
         "volume": 100,
         "schedule": "2025-03-04",
-        "audioPath": "E:/mp3/周杰伦 - 发如雪.mp3"
+        "audioPath": "C:/Users/lel99/Desktop/mp3/周杰伦 - 发如雪.mp3",
+        "status": "已播放"
     },
     {
         "id": "3",
-        "name": "开会",
-        "startTime": "10:33:32",
-        "endTime": "10:37:48",
+        "name": "测试1",
+        "startTime": "16:09:00",
+        "endTime": "16:13:16",
         "volume": 100,
-        "schedule": "一, 二, 三, 四, 五, 六, 日",
-        "audioPath": "E:/mp3/温奕心 - 一路生花.mp3"
+        "schedule": "2025-03-04",
+        "audioPath": "C:/Users/lel99/Desktop/mp3/温奕心 - 一路生花.mp3",
+        "status": "已播放"
+    },
+    {
+        "id": "4",
+        "name": "任务7",
+        "startTime": "16:13:43",
+        "endTime": "16:17:59",
+        "volume": 100,
+        "schedule": "2025-03-04",
+        "audioPath": "C:/Users/lel99/Desktop/mp3/温奕心 - 一路生花.mp3",
+        "status": "已播放"
+    },
+    {
+        "id": "5",
+        "name": "测试3",
+        "startTime": "16:19:57",
+        "endTime": "16:25:01",
+        "volume": 100,
+        "schedule": "2025-03-04",
+        "audioPath": "C:/Users/lel99/Desktop/mp3/爱的代价-张艾嘉.mp3",
+        "status": "已播放"
+    },
+    {
+        "id": "6",
+        "name": "测试",
+        "startTime": "17:04:05",
+        "endTime": "17:08:21",
+        "volume": 100,
+        "schedule": "2025-03-04",
+        "audioPath": "C:/Users/lel99/Desktop/mp3/温奕心 - 一路生花.mp3",
+        "status": "正在播放"
+    },
+    {
+        "id": "7",
+        "name": "测试2",
+        "startTime": "17:10:17",
+        "endTime": "17:15:08",
+        "volume": 100,
+        "schedule": "2025-03-04",
+        "audioPath": "C:/Users/lel99/Desktop/mp3/Beyond－长城.mp3",
+        "status": "等待播放"
+    },
+    {
+        "id": "8",
+        "name": "名称",
+        "startTime": "17:15:00",
+        "endTime": "17:20:04",
+        "volume": 100,
+        "schedule": "一, 二, 三, 四, 五",
+        "audioPath": "C:/Users/lel99/Desktop/mp3/爱的代价-张艾嘉.mp3",
+        "status": "等待播放"
     }
 ]
