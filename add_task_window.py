@@ -190,9 +190,7 @@ class AddTaskWindow:
                 self.minute_var.set(times[1].zfill(2))
                 self.second_var.set(times[2].zfill(2))
         else:
-            now = datetime.datetime.now()
-            current_time = now.strftime("%H:%M:%S")
-            times = current_time.split(":")
+            times = self.default_time.split(":")
             self.hour_var.set(times[0].zfill(2))
             self.minute_var.set(times[1].zfill(2))
             self.second_var.set(times[2].zfill(2))
