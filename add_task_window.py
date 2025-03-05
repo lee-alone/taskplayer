@@ -453,7 +453,7 @@ class AddTaskWindow:
                 task_data[3],  # 音量
                 task_data[4],  # 播放日期/星期
                 task_data[5],  # 文件路径
-                "创建任务"      # 默认状态
+                # "创建任务"      # 默认状态
             ]
 
             # 更新或插入 Treeview
