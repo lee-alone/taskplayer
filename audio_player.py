@@ -149,11 +149,38 @@ class AudioPlayer:
         """Configure ttk widget styles for the application."""
         style = ttk.Style()
         style.theme_use('clam')
-        style.configure("Treeview", background=BACKGROUND_COLOR, fieldbackground=BACKGROUND_COLOR, foreground="#37474F", font=NORMAL_FONT, rowheight=30)
-        style.configure("Treeview.Heading", background=PRIMARY_COLOR, foreground="white", font=TITLE_FONT, relief="flat", padding=(10, 5))
-        style.map("Treeview.Heading", background=[('active', SECONDARY_COLOR)])
-        style.map("Treeview", background=[('selected', PRIMARY_COLOR)], foreground=[('selected', 'white')], highlightthickness=[('hover', 1)])
         
+        # 表格基本样式
+        style.configure("Treeview", 
+                      background=BACKGROUND_COLOR,
+                      fieldbackground=BACKGROUND_COLOR,
+                      foreground="#37474F",
+                      font=NORMAL_FONT,
+                      rowheight=30)
+        
+        # 表头样式
+        style.configure("Treeview.Heading",
+                      background=PRIMARY_COLOR,
+                      foreground="white",
+                      font=TITLE_FONT,
+                      relief="flat",
+                      padding=(10, 5))
+        
+        # 不同状态的颜色配置
+        style.map("Treeview",
+                 background=[('selected', PRIMARY_COLOR)],
+                 foreground=[('selected', 'white')])
+        
+        # 设置各种状态的标签样式
+        self.status_colors = {
+            'playing': {'fg': '#4CAF50', 'bg': '#E8F5E9'},  # 绿色系
+            'paused': {'fg': '#FFA000', 'bg': '#FFF3E0'},   # 橙色系
+            'waiting': {'fg': '#757575', 'bg': BACKGROUND_COLOR},  # 灰色系
+            'error': {'fg': '#F44336', 'bg': '#FFEBEE'},    # 红色系
+            'paused_today': {'fg': '#0288D1', 'bg': '#E1F5FE'},  # 蓝色系
+            'completed': {'fg': '#9C27B0', 'bg': '#F3E5F5'}  # 紫色系，新增完成状态
+        }
+
         # 配置基本 Custom.TButton 样式
         style.configure("Custom.TButton", font="微软雅黑 10", padding=(8, 4), borderwidth=0, background=PRIMARY_COLOR, foreground="white")
         style.map("Custom.TButton", background=[('active', SECONDARY_COLOR), ('pressed', "#00897B")], foreground=[('active', 'white')])
@@ -587,7 +614,7 @@ class AudioPlayer:
             self.root.after(1000, self.update_time)
 
     def check_tasks(self):
-        """定期检查任务，跳过当天暂停的任务"""
+        """定期检查任务，优化调度逻辑"""
         try:
             now = datetime.datetime.now()
             current_time = now.time()
@@ -596,10 +623,10 @@ class AudioPlayer:
 
             for item in self.tree.get_children():
                 values = self.tree.item(item)['values']
-                if len(values) < 7 or values[-1] in ["正在播放", "已暂停", "Pause today"]:  # 跳过当天暂停的任务
-                    continue
-
-                if self.manual_stop and item == self.current_playing_item:
+                current_status = values[-1]
+                
+                # 跳过特定状态的任务
+                if current_status in ["已暂停", "Pause today"]:
                     continue
 
                 start_time_str, schedule_str, audio_path = values[2], values[5], values[6]
@@ -608,39 +635,41 @@ class AudioPlayer:
                     continue
 
                 try:
+                    # 解析时间
                     start_time = datetime.datetime.strptime(start_time_str, "%H:%M:%S").time()
-                    start_datetime = datetime.datetime.combine(now.date(), start_time)
-                    time_diff = abs((now - start_datetime).total_seconds())
-
-                    # 日期对比或星期对比
-                    date_match = False
-                    if "," in schedule_str:  # 星期对比
+                    now_time = datetime.datetime.strptime(now.strftime("%H:%M:%S"), "%H:%M:%S").time()
+                    
+                    # 检查是否是今天的任务
+                    is_today = False
+                    if "," in schedule_str:  # 每周重复模式
                         weekdays = [day.strip() for day in schedule_str.split(",")]
-                        date_match = current_weekday in weekdays
-                    else:  # 日期对比
-                        date_match = schedule_str == current_date
+                        is_today = current_weekday in weekdays
+                    else:  # 单次日期模式
+                        is_today = schedule_str == current_date
+                    
+                    # 检查时间是否匹配
+                    time_matches = (start_time.hour == now_time.hour and 
+                                  start_time.minute == now_time.minute and 
+                                  start_time.second == now_time.second)
 
-                    # 时间对比
-                    time_match = time_diff <= 1
-
-                    if date_match and time_match:
+                    if is_today and time_matches:
+                        # 如果当前有其他任务在播放，强制切换
                         if self.current_playing_item and self.current_playing_item != item:
-                            self.stop_task()
-                        if not self.current_playing_sound:
-                            if self.current_playing_item:
-                                current_item_values = self.tree.item(self.current_playing_item)['values']
-                                current_item_end_time_str = current_item_values[3]
-                                start_time_str = values[2]
-                                if current_item_end_time_str == start_time_str:
-                                    time.sleep(0.5)  # 延迟 500ms
-                            self.play_task(item)
+                            old_item = self.current_playing_item
+                            self.stop_task()  # 停止当前任务
+                            # 更新原任务的状态
+                            self.update_task_status(old_item, "等待播放", 'waiting')
+                            self.update_task_index_display(old_item, is_playing=False)
+                        
+                        # 播放新任务
+                        self.play_task(item, force_switch=True)
 
                 except ValueError as e:
-                    logging.warning(f"Invalid time format in task {values[1]}: {e}")
+                    logging.warning(f"任务时间格式无效: {e}")
                     self.update_task_status(item, "时间格式错误", 'error')
 
         except Exception as e:
-            logging.error(f"Task check failed: {e}")
+            logging.error(f"任务检查失败: {e}")
         finally:
             self.root.after(1000, self.check_tasks)
 
@@ -671,24 +700,19 @@ class AudioPlayer:
             logging.warning(f"Task validation error: {e}")
             return False
 
-    def play_task(self, item=None, file_path=None, volume=None):
+    def play_task(self, item=None, force_switch=False):
         """播放任务的统一入口"""
         try:
-            pygame.init()
-            pygame.mixer.init()
-
-            # 获取任务信息
-            if not item and not file_path:
+            if not item:
                 selected = self.tree.selection()
                 if not selected:
                     messagebox.showinfo("提示", "请先选择要播放的任务")
                     return
                 item = selected[0]
             
-            if item:
-                values = self.tree.item(item)['values']
-                file_path = values[6]
-                volume = int(values[4])
+            values = self.tree.item(item)['values']
+            file_path = values[6]
+            volume = int(values[4])
             
             # 检查文件是否存在
             if not os.path.exists(file_path):
@@ -696,12 +720,8 @@ class AudioPlayer:
                 messagebox.showerror("错误", f"音频文件未找到: {file_path}")
                 return
 
-            # 如果有其他任务在播放，先停止
-            if self.current_playing_sound and item != self.current_playing_item:
-                self.stop_task()
-
-            # 开始播放
-            success, duration = self.player.play(file_path, volume)
+            # 播放音频
+            success, duration = self.player.play(file_path, volume, force_switch=force_switch)
             if not success:
                 raise Exception("音频加载失败")
 
@@ -718,14 +738,6 @@ class AudioPlayer:
             self.play_buttons_ref["停止"].config(state="normal")
             self.play_buttons_ref["播放/暂停"].config(text="⏸ 暂停")
             self.status_label.config(text=f"正在播放: {values[1]}")
-
-            # 启动进度监控
-            self.stop_thread = False
-            if self.playing_thread and self.playing_thread.is_alive():
-                self.stop_thread = True
-                self.playing_thread.join()
-            self.playing_thread = threading.Thread(target=lambda: self.update_play_progress(self.lock), daemon=True)
-            self.playing_thread.start()
             
         except Exception as e:
             logging.error(f"播放任务失败: {e}")
@@ -735,62 +747,48 @@ class AudioPlayer:
             messagebox.showerror("错误", f"播放失败: {str(e)}")
 
     def stop_task(self, event=None):
-        """停止当前播放任务，改进状态清理和线程管理"""
+        """停止当前播放任务"""
         if not self.current_playing_sound:
-            return  # 无任务播放时直接返回
+            return
 
         try:
             # 设置手动停止标志
             self.manual_stop = True
-            # 停止播放和线程
-            self.stop_thread = True
-            pygame.mixer.music.stop()
-            self.current_playing_sound = None # 停止后立即更新
-            if self.playing_thread and self.playing_thread.is_alive():
-                self.playing_thread.join(timeout=1.0)  # 设置超时避免长时间阻塞
-                if self.playing_thread.is_alive():
-                    logging.warning("播放线程join超时，尝试强制停止")
-                    self.stop_thread = True
+            # 停止播放和清空队列
+            self.player.stop()
             
             # 更新任务状态
-            if self.current_playing_item:
+            if self.current_playing_item and self.current_playing_item in self.tree.get_children():
+                values = self.tree.item(self.current_playing_item)["values"]
+                now = datetime.datetime.now()
                 try:
-                    values = self.tree.item(self.current_playing_item)["values"]
-                    start_time_str, end_time_str = values[2], values[3]
-                    current_date = datetime.datetime.now().strftime("%Y-%m-%d")
-                    now = datetime.datetime.now()
-                    try:
-                        start_time = datetime.datetime.strptime(f"{current_date} {start_time_str}", "%Y-%m-%d %H:%M:%S")
-                        end_time = datetime.datetime.strptime(f"{current_date} {end_time_str}", "%Y-%m-%d %H:%M:%S")
-                        status_text = "等待播放" if now < end_time else "已播放"
-                    except ValueError as e:
-                        logging.warning(f"时间解析错误: {e}")
-                        status_text = "等待播放"
-                    
-                    # 检查任务项是否仍然存在
-                    if self.current_playing_item in self.tree.get_children():
-                        self.update_task_status(self.current_playing_item, status_text, 'waiting')
-                        self.update_task_index_display(self.current_playing_item, is_playing=False)
-                except tk.TclError:
-                    logging.info("正在播放的任务项已被移除")
-                    pass
+                    start_time = datetime.datetime.strptime(values[2], "%H:%M:%S").time()
+                    end_time = datetime.datetime.strptime(values[3], "%H:%M:%S").time()
+                    current_time = now.time()
+                    status_text = "等待播放" if current_time < end_time else "已播放"
+                except ValueError:
+                    status_text = "等待播放"
+                
+                self.update_task_status(self.current_playing_item, status_text, 'waiting')
+                self.update_task_index_display(self.current_playing_item, is_playing=False)
             
-            # 重置播放状态
+            # 重置状态
             self.current_playing_sound = None
             self.current_playing_item = None
-            self.paused = False
             self.current_playing_duration = 0
-            self.manual_stop = False  # 重置手动停止标志
+            self.manual_stop = False
+            self.paused = False
+            
+            # 更新UI
             self.play_buttons_ref["停止"].config(state="disabled")
             self.play_buttons_ref["播放/暂停"].config(text="▶ 播放/暂停")
             self.status_label.config(text="就绪")
-            pygame.mixer.quit()
-            pygame.quit()
+            self.progress_bar['value'] = 0
 
         except Exception as e:
             logging.error(f"停止任务失败: {e}")
             self.status_label.config(text="停止任务出错")
-            self.root.update()
+
     def pause_task(self):
         if self.current_playing_sound and not self.paused:
             pygame.mixer.music.pause()
@@ -875,42 +873,47 @@ class AudioPlayer:
 
 
     def update_task_status(self, item, status_text, status_tag):
-        """更新任务状态，确保一致性和UI同步"""
+        """更新任务状态和样式"""
         if not item or item not in self.tree.get_children():
-            return  # 防止操作已删除的任务
-
+            return
+            
         try:
             values = list(self.tree.item(item)["values"])
             tags = list(self.tree.item(item)["tags"])
-
-            # 更新状态值
+            
+            # 更新状态文本
             if len(values) < len(self.columns):
-                values.extend([""] * (len(self.columns) - len(values)))  # 补齐缺失的列
+                values.extend([""] * (len(self.columns) - len(values)))
             values[-1] = status_text
-
-            # 更新标签，去除旧的状态标签并添加新的
-            status_tags = ['playing', 'paused', 'waiting', 'error', 'paused_today']
+            
+            # 更新样式标签
+            status_tags = ['playing', 'paused', 'waiting', 'error', 'paused_today', 'completed']
             tags = [tag for tag in tags if tag not in status_tags] + [status_tag]
+            
+            # 应用样式
+            if status_tag in self.status_colors:
+                style_dict = self.status_colors[status_tag]
+                self.tree.tag_configure(status_tag, 
+                                      foreground=style_dict['fg'],
+                                      background=style_dict['bg'])
+            
             self.tree.item(item, values=values, tags=tags)
-
+            
             # 更新任务数据
             task_id = self.task_id_map.get(item)
             if task_id:
                 set_task_status(task_id, status_text)
-
-            # 更新状态栏文本
+            
+            # 更新状态栏
             task_name = values[1]
-            if status_text == "已暂停" and self.current_playing_item == item:
-                elapsed = pygame.mixer.music.get_pos() / 1000
+            if status_text == "已暂停":
+                elapsed = pygame.mixer.music.get_pos() / 1000 if self.current_playing_item == item else 0
                 elapsed_str = time.strftime('%M:%S', time.gmtime(elapsed))
                 total_str = time.strftime('%M:%S', time.gmtime(self.current_playing_duration))
-                self.status_label.config(text=f"任务: {task_name} ({elapsed_str}/{total_str}) 已暂停")
-            elif status_text == "正在播放" and self.current_playing_item == item:
-                # 播放进度由 update_play_progress 处理，这里仅设置初始状态
-                self.status_label.config(text=f"正在播放: {task_name}")
+                self.status_label.config(text=f"任务: {task_name} ({elapsed_str}/{total_str}) - {status_text}")
             else:
                 self.status_label.config(text=f"任务: {task_name} - {status_text}")
-
+                
         except Exception as e:
             logging.error(f"更新任务状态失败: {e}")
             self.status_label.config(text=f"状态更新出错: {str(e)}")
