@@ -61,8 +61,6 @@ class AddTaskWindow:
         frame.pack(fill=tk.X)
         self.task_name_entry = ttk.Entry(frame, font=NORMAL_FONT)
         self.task_name_entry.pack(fill=tk.X, padx=5, pady=5)
-        #if task_data:
-        #    self.task_name_entry.insert(0, task_data[1])
 
 
     def setup_date_selection(self, parent, task_data=None):

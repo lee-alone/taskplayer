@@ -1,32 +1,42 @@
 [
     {
         "id": "1",
+        "name": "未确认",
+        "startTime": "05:30:37",
+        "endTime": "05:34:20",
+        "volume": 100,
+        "schedule": "一, 二, 三, 四, 五",
+        "audioPath": "C:/Users/lel99/Desktop/mp3/周杰伦 - 稻香.mp3",
+        "status": "已播放"
+    },
+    {
+        "id": "2",
         "name": "测试1",
         "startTime": "10:28:28",
         "endTime": "10:32:11",
         "volume": 100,
         "schedule": "一, 二, 三, 四, 五",
         "audioPath": "C:/Users/lel99/Desktop/mp3/周杰伦 - 稻香.mp3",
-        "status": "正在播放"
+        "status": "已播放"
     },
     {
-        "id": "2",
+        "id": "3",
         "name": "测试3",
         "startTime": "10:31:52",
         "endTime": "10:36:56",
         "volume": 100,
         "schedule": "一, 二, 三, 四, 五",
         "audioPath": "C:/Users/lel99/Desktop/mp3/爱的代价-张艾嘉.mp3",
-        "status": "Pause today"
+        "status": "已播放"
     },
     {
-        "id": "3",
+        "id": "4",
         "name": "测试3撒",
         "startTime": "10:32:13",
         "endTime": "10:37:04",
         "volume": 100,
         "schedule": "一, 二, 三, 四, 五",
         "audioPath": "C:/Users/lel99/Desktop/mp3/Beyond－长城.mp3",
-        "status": "正在播放"
+        "status": "已播放"
     }
 ]
