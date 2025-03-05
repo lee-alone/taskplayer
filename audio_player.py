@@ -46,6 +46,8 @@ class AudioPlayer:
         self.last_date = None  # 用于追踪日期变化
         self.setup_root_window()
         self.init_variables()
+        #pygame.init()
+        #pygame.mixer.init()
         self.setup_styles()
         self.create_main_layout()
         self.setup_components()
@@ -249,36 +251,40 @@ class AudioPlayer:
 
 
     def toggle_playback(self, event=None):
-        """切换播放/暂停状态，改进逻辑清晰度和状态管理，检查全选状态"""
+        """切换播放/暂停状态"""
         selected = self.tree.selection()
         all_items = self.tree.get_children()
         if not selected or len(selected) == len(all_items):  # 全选时禁用播放
             messagebox.showinfo("提示", "请先选择单个任务进行播放（全选状态下不可播放）")
             return
+
         item = selected[0]
         values = self.tree.item(item)["values"]
 
         try:
-            if not self.current_playing_sound:  # 无任务播放，开始播放选中任务
+            if not self.current_playing_sound:  # 无任务播放,开始播放选中任务
                 self.play_task(item)
-            elif self.current_playing_item == item:  # 当前任务已选中，切换播放/暂停
+                
+            elif self.current_playing_item == item:  # 当前任务,切换暂停/恢复
                 if self.paused:
-                    pygame.mixer.music.unpause()
-                    self.paused = False
+                    # 恢复播放
+                    self.player.resume()
+                    self.paused = False 
                     self.update_task_status(item, "正在播放", 'playing')
                     self.update_task_index_display(item, is_playing=True)
                     self.play_buttons_ref["播放/暂停"].config(text="⏸ 暂停")
                     self.status_label.config(text=f"正在播放: {values[1]}")
                 else:
-                    pygame.mixer.music.pause()
+                    # 暂停播放
+                    self.player.pause()
                     self.paused = True
                     self.update_task_status(item, "已暂停", 'paused')
-                    self.update_task_index_display(item, is_playing=False)
-                    self.play_buttons_ref["播放/暂停"].config(text="▶ 继续")
+                    self.update_task_index_display(item, is_playing=False)  
+                    self.play_buttons_ref["播放/暂停"].config(text="▶ 恢复")
+                    
             else:  # 选择了其他任务
-                if not self.paused:  # 如果当前是暂停状态，则不播放新任务
-                    self.stop_task()
-                    self.play_task(item)
+                self.stop_task()  # 停止当前播放
+                self.play_task(item)  # 播放新选中的任务
 
         except Exception as e:
             logging.error(f"切换播放状态失败: {e}")
@@ -666,10 +672,11 @@ class AudioPlayer:
             return False
 
     def play_task(self, item=None, file_path=None, volume=None):
-        """重构后的播放任务方法"""
+        """播放任务的统一入口"""
         try:
             pygame.init()
             pygame.mixer.init()
+
             # 获取任务信息
             if not item and not file_path:
                 selected = self.tree.selection()
@@ -698,25 +705,25 @@ class AudioPlayer:
             if not success:
                 raise Exception("音频加载失败")
 
+            # 更新状态
             self.manual_stop = False
             self.current_playing_sound = file_path
             self.current_playing_item = item
             self.current_playing_duration = duration
             self.paused = False
-            pygame.mixer.music.play()
             
-            # 更新状态和UI
+            # 更新UI
             self.update_task_status(item, "正在播放", 'playing')
             self.update_task_index_display(item, is_playing=True)
             self.play_buttons_ref["停止"].config(state="normal")
             self.play_buttons_ref["播放/暂停"].config(text="⏸ 暂停")
             self.status_label.config(text=f"正在播放: {values[1]}")
 
-            # 启动播放进度线程
+            # 启动进度监控
             self.stop_thread = False
             if self.playing_thread and self.playing_thread.is_alive():
                 self.stop_thread = True
-                self.playing_thread.join()  # 确保旧线程结束
+                self.playing_thread.join()
             self.playing_thread = threading.Thread(target=lambda: self.update_play_progress(self.lock), daemon=True)
             self.playing_thread.start()
             
@@ -738,8 +745,12 @@ class AudioPlayer:
             # 停止播放和线程
             self.stop_thread = True
             pygame.mixer.music.stop()
+            self.current_playing_sound = None # 停止后立即更新
             if self.playing_thread and self.playing_thread.is_alive():
                 self.playing_thread.join(timeout=1.0)  # 设置超时避免长时间阻塞
+                if self.playing_thread.is_alive():
+                    logging.warning("播放线程join超时，尝试强制停止")
+                    self.stop_thread = True
             
             # 更新任务状态
             if self.current_playing_item:
@@ -773,6 +784,8 @@ class AudioPlayer:
             self.play_buttons_ref["停止"].config(state="disabled")
             self.play_buttons_ref["播放/暂停"].config(text="▶ 播放/暂停")
             self.status_label.config(text="就绪")
+            pygame.mixer.quit()
+            pygame.quit()
 
         except Exception as e:
             logging.error(f"停止任务失败: {e}")
@@ -789,7 +802,7 @@ class AudioPlayer:
     def update_play_progress(self, lock):
         """更新播放进度，优化线程退出和UI刷新"""
         try:
-            while not self.stop_thread and self.current_playing_sound:
+            while not self.stop_thread and self.current_playing_sound and not self.manual_stop:
                 with lock:
                     if pygame.mixer.music.get_busy() and not self.paused:
                         # 检查当前播放的任务项是否还存在
@@ -850,6 +863,7 @@ class AudioPlayer:
                 self.play_buttons_ref["播放/暂停"].config(text="▶ 播放/暂停")
             if hasattr(self, 'status_label'):
                 self.status_label.config(text="就绪")
+            self.play_buttons_ref["播放/暂停"].config(text="▶ 播放/暂停")
         except Exception as e:
             logging.error(f"播放完成处理失败: {e}")
             # 确保状态被重置
