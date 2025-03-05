@@ -76,12 +76,12 @@ class AudioPlayer:
         self.root.bind("<Control-c>", lambda e: self.copy_task())
 
         # 上移任务 (Ctrl+Up)
-        self.root.bind_all("<Control-Key-Up>", lambda e: [self.tree.focus_set(), self._move_task(-1), self.root.focus_force()])
-        ToolTip(self.tree, "上移选中任务 (Ctrl+Up)")
+        #self.root.bind_all("<Control-Key-Up>", lambda e: [self.tree.focus_set(), self._move_task(-1), self.root.focus_force()])
+        #ToolTip(self.tree, "上移选中任务 (Ctrl+Up)")
 
         # 下移任务 (Ctrl+Down)
-        self.root.bind_all("<Control-Key-Down>", lambda e: [self.tree.focus_set(), self._move_task(1), self.root.focus_force()])
-        ToolTip(self.tree, "下移选中任务 (Ctrl+Down)")
+        #self.root.bind_all("<Control-Key-Down>", lambda e: [self.tree.focus_set(), self._move_task(1), self.root.focus_force()])
+        #ToolTip(self.tree, "下移选中任务 (Ctrl+Down)")
 
         # 同步时间 (Ctrl+T)
         self.root.bind_all("<Control-t>", lambda e: self.sync_time())
@@ -152,11 +152,11 @@ class AudioPlayer:
         style.map("Treeview", background=[('selected', PRIMARY_COLOR)], foreground=[('selected', 'white')], highlightthickness=[('hover', 1)])
         
         # 配置基本 Custom.TButton 样式
-        style.configure("Custom.TButton", font=NORMAL_FONT, padding=(12, 6), borderwidth=0, background=PRIMARY_COLOR, foreground="white")
+        style.configure("Custom.TButton", font="微软雅黑 10", padding=(8, 4), borderwidth=0, background=PRIMARY_COLOR, foreground="white")
         style.map("Custom.TButton", background=[('active', SECONDARY_COLOR), ('pressed', "#00897B")], foreground=[('active', 'white')])
         
         # 为带有快捷键提示的按钮配置变体样式
-        style.configure("Shortcut.TButton", font=("Arial", 10, "italic"), padding=(12, 6), background=PRIMARY_COLOR, foreground="white")
+        style.configure("Shortcut.TButton", font="微软雅黑 10", padding=(8, 4), background=PRIMARY_COLOR, foreground="white")
         style.map("Shortcut.TButton", background=[('active', SECONDARY_COLOR), ('pressed', "#00897B")], foreground=[('active', 'white')])
         
         style.configure("Horizontal.TProgressbar", background=PRIMARY_COLOR, troughcolor="#f5f5f5", bordercolor="#e0e0e0", lightcolor="#64b5f6", darkcolor=SECONDARY_COLOR)
@@ -203,8 +203,8 @@ class AudioPlayer:
         self.tree = ttk.Treeview(tree_frame, columns=self.columns, show="headings", 
                                 selectmode="extended", style="Treeview")
         for col in self.columns:
-            self.tree.heading(col, text=col, command=lambda c=col: self.sort_by_column(c))
-            self.tree.column(col, width=column_widths[col], minwidth=50, 
+            self.tree.heading(col, text=col)
+            self.tree.column(col, width=column_widths[col], minwidth=50,
                             anchor="center" if col not in ["文件路径", "任务名称"] else "w", stretch=True)
         
         # 配置标签，新增 'paused_today' 状态
@@ -298,12 +298,13 @@ class AudioPlayer:
             ("新增任务", "🆕", self.add_task, "添加新任务 (Ctrl+N)"),
             ("删除任务", "❌", self.delete_task, "删除选中任务 (Del)"),
             ("复制任务", "📋", self.copy_task, "复制选中任务 (Ctrl+C)"),
+            ("同步时间", "🕒", self.sync_time, "同步系统时间 (Ctrl+T)"),
             ("导入任务", "📥", self.import_tasks, "从文件导入任务 (Ctrl+I)"),
             ("导出任务", "📤", self.export_tasks, "导出任务到文件 (Ctrl+O)"),
         ]
         for i, (text, icon, command, tooltip) in enumerate(left_buttons):
             btn = ttk.Button(left_buttons_frame, text=f"{icon} {text} ({tooltip.split('(')[-1]}", style="Shortcut.TButton", command=command)
-            btn.grid(row=i // 3, column=i % 3, padx=5, pady=5, sticky=(tk.W, tk.E))
+            btn.grid(row=i // 3, column=i % 3, padx=3, pady=3, sticky=(tk.W, tk.E))
             ToolTip(btn, tooltip)
         left_buttons_frame.grid_columnconfigure((0, 1, 2), weight=1)
 
@@ -322,7 +323,7 @@ class AudioPlayer:
                 btn = self.play_buttons_ref["播放/暂停"]
             else:
                 btn = ttk.Button(center_buttons_frame, text=f"{icon} {text} ({tooltip.split('(')[-1]}", style="Shortcut.TButton", command=command)
-            btn.grid(row=0, column=i, padx=5, pady=5, sticky=(tk.W, tk.E))
+            btn.grid(row=0, column=i, padx=3, pady=3, sticky=(tk.W, tk.E))
             self.play_buttons_ref[text] = btn
             ToolTip(btn, tooltip)
         center_buttons_frame.grid_columnconfigure((0, 1, 2), weight=1)
@@ -330,14 +331,10 @@ class AudioPlayer:
         # 右侧按钮
         right_buttons_frame = tk.Frame(controls_main_frame, bg=BACKGROUND_COLOR)
         right_buttons_frame.grid(row=0, column=2, sticky=(tk.W, tk.E))
-        right_buttons = [
-            ("上移任务", "⬆", self.move_task_up, "上移选中任务 (Ctrl+Up)"),
-            ("同步时间", "🕒", self.sync_time, "同步系统时间 (Ctrl+T)"),
-            ("下移任务", "⬇", self.move_task_down, "下移选中任务 (Ctrl+Down)"),
-        ]
+        right_buttons = []
         for i, (text, icon, command, tooltip) in enumerate(right_buttons):
             btn = ttk.Button(right_buttons_frame, text=f"{icon} {text} ({tooltip.split('(')[-1]}", style="Shortcut.TButton", command=command)
-            btn.grid(row=i, column=0, padx=5, pady=5, sticky=(tk.W, tk.E))
+            btn.grid(row=i, column=0, padx=3, pady=3, sticky=(tk.W, tk.E))
             ToolTip(btn, tooltip)
         right_buttons_frame.grid_columnconfigure(0, weight=1)
 
@@ -467,6 +464,8 @@ class AudioPlayer:
         if not tasks:
             self.status_label.config(text="无任务可加载")
             return
+
+        self.save_all_tasks()
         
         now = datetime.datetime.now()
         current_time = now.time()
@@ -725,7 +724,7 @@ class AudioPlayer:
                 self.update_task_index_display(item, is_playing=False)
             messagebox.showerror("错误", f"播放失败: {str(e)}")
 
-    def stop_task(self):
+    def stop_task(self, event=None):
         """停止当前播放任务，改进状态清理和线程管理"""
         if not self.current_playing_sound:
             return  # 无任务播放时直接返回
@@ -741,28 +740,33 @@ class AudioPlayer:
             
             # 更新任务状态
             if self.current_playing_item:
-                values = self.tree.item(self.current_playing_item)["values"]
-                start_time_str, end_time_str = values[2], values[3]
-                current_date = datetime.datetime.now().strftime("%Y-%m-%d")
-                now = datetime.datetime.now()
                 try:
-                    start_time = datetime.datetime.strptime(f"{current_date} {start_time_str}", "%Y-%m-%d %H:%M:%S")
-                    end_time = datetime.datetime.strptime(f"{current_date} {end_time_str}", "%Y-%m-%d %H:%M:%S")
-                    status_text = "等待播放" if now < end_time else "已播放"
-                    self.manual_stop = False # 重置手动停止标志
-                except ValueError as e:
-                    logging.warning(f"时间解析错误: {e}")
-                    status_text = "等待播放"
-                    self.manual_stop = False # 即使解析错误，也重置标志，防止影响后续任务
-                
-                self.update_task_status(self.current_playing_item, status_text, 'waiting')
-                self.update_task_index_display(self.current_playing_item, is_playing=False)
-
+                    values = self.tree.item(self.current_playing_item)["values"]
+                    start_time_str, end_time_str = values[2], values[3]
+                    current_date = datetime.datetime.now().strftime("%Y-%m-%d")
+                    now = datetime.datetime.now()
+                    try:
+                        start_time = datetime.datetime.strptime(f"{current_date} {start_time_str}", "%Y-%m-%d %H:%M:%S")
+                        end_time = datetime.datetime.strptime(f"{current_date} {end_time_str}", "%Y-%m-%d %H:%M:%S")
+                        status_text = "等待播放" if now < end_time else "已播放"
+                    except ValueError as e:
+                        logging.warning(f"时间解析错误: {e}")
+                        status_text = "等待播放"
+                    
+                    # 检查任务项是否仍然存在
+                    if self.current_playing_item in self.tree.get_children():
+                        self.update_task_status(self.current_playing_item, status_text, 'waiting')
+                        self.update_task_index_display(self.current_playing_item, is_playing=False)
+                except tk.TclError:
+                    logging.info("正在播放的任务项已被移除")
+                    pass
+            
             # 重置播放状态
             self.current_playing_sound = None
             self.current_playing_item = None
             self.paused = False
             self.current_playing_duration = 0
+            self.manual_stop = False  # 重置手动停止标志
             self.play_buttons_ref["停止"].config(state="disabled")
             self.play_buttons_ref["播放/暂停"].config(text="▶ 播放/暂停")
             self.status_label.config(text="就绪")
@@ -785,6 +789,11 @@ class AudioPlayer:
             while not self.stop_thread and self.current_playing_sound:
                 with lock:
                     if pygame.mixer.music.get_busy() and not self.paused:
+                        # 检查当前播放的任务项是否还存在
+                        if not self.current_playing_item or self.current_playing_item not in self.tree.get_children():
+                            self.root.after(0, self._on_playback_complete)
+                            break
+                        
                         current_position = pygame.mixer.music.get_pos() / 1000  # 转换为秒
                         progress = min((current_position / self.current_playing_duration) * 100, 100)
                         self.root.after(0, self._update_progress_ui, current_position, progress)
@@ -800,27 +809,50 @@ class AudioPlayer:
     def _update_progress_ui(self, elapsed, progress):
         """更新播放进度UI"""
         try:
+            if not self.current_playing_item or self.current_playing_item not in self.tree.get_children():
+                return
+            
             elapsed_str = time.strftime('%M:%S', time.gmtime(elapsed))
             total_str = time.strftime('%M:%S', time.gmtime(self.current_playing_duration))
-            if self.current_playing_item:
+            
+            try:
                 values = self.tree.item(self.current_playing_item)["values"]
                 self.status_label.config(text=f"正在播放: {values[1]} ({elapsed_str}/{total_str})")
+            except tk.TclError:
+                # 如果任务项已被删除或修改，停止播放
+                self.root.after(0, self._on_playback_complete)
         except Exception as e:
-            logging.warning(f"UI更新失败: {e}")
+            # 仅在调试级别记录这个警告，避免刷屏
+            logging.debug(f"UI更新失败: {e}")
 
     def _on_playback_complete(self):
         """处理播放自然结束"""
-        if self.current_playing_item:
-            values = self.tree.item(self.current_playing_item)["values"]
-            self.update_task_status(self.current_playing_item, "已播放", 'waiting')
-            self.update_task_index_display(self.current_playing_item, is_playing=False)
-        self.current_playing_sound = None
-        self.current_playing_item = None
-        self.paused = False
-        self.play_buttons_ref["停止"].config(state="disabled")
-        self.play_buttons_ref["播放/暂停"].config(text="▶ 播放/暂停")
-        self.status_label.config(text="就绪")
-
+        try:
+            if self.current_playing_item and self.current_playing_item in self.tree.get_children():
+                try:
+                    values = self.tree.item(self.current_playing_item)["values"]
+                    self.update_task_status(self.current_playing_item, "已播放", 'waiting')
+                    self.update_task_index_display(self.current_playing_item, is_playing=False)
+                except tk.TclError:
+                    logging.info("正在播放的任务项已被移除")
+            
+            # 无论是否成功更新状态，都清理播放状态
+            self.current_playing_sound = None
+            self.current_playing_item = None
+            self.paused = False
+            if hasattr(self, 'play_buttons_ref'):
+                self.play_buttons_ref["停止"].config(state="disabled")
+                self.play_buttons_ref["播放/暂停"].config(text="▶ 播放/暂停")
+            if hasattr(self, 'status_label'):
+                self.status_label.config(text="就绪")
+        except Exception as e:
+            logging.error(f"播放完成处理失败: {e}")
+            # 确保状态被重置
+            self.current_playing_sound = None
+            self.current_playing_item = None
+            self.paused = False
+            if hasattr(self, 'status_label'):
+                self.status_label.config(text="就绪")
 
 
     def update_task_status(self, item, status_text, status_tag):
@@ -1002,40 +1034,40 @@ class AudioPlayer:
             self.status_label.config(text="复制任务出错")
             messagebox.showerror("错误", f"复制任务失败: {str(e)}")
 
-    def move_task_up(self):
-        """上移选定任务"""
-        self._move_task(-1)
+    #def move_task_up(self):
+    #    """上移选定任务"""
+    #    self._move_task(-1)
 
-    def move_task_down(self):
-        """下移选定任务"""
-        self._move_task(1)
+    #def move_task_down(self):
+    #    """下移选定任务"""
+    #    self._move_task(1)
 
-    def _move_task(self, direction):
-        """移动任务的核心逻辑，优化边界检查和状态更新"""
-        try:
-            selected = self.tree.selection()
-            if not selected:
-                messagebox.showinfo("提示", "请先选择要移动的任务")
-                return
-            
-            item = selected[0]
-            current_idx = self.tree.index(item)
-            new_idx = current_idx + direction
-            
-            if 0 <= new_idx < len(self.tree.get_children()):
-                self.tree.move(item, "", new_idx)
-                self.update_task_order()
-                self.status_label.config(text=f"任务已{'上移' if direction < 0 else '下移'}")
-                # 保持选择状态
-                self.tree.selection_set(item)
-                self.tree.focus(item)
-            else:
-                self.status_label.config(text="已到达列表顶部或底部")
-                
-        except Exception as e:
-            logging.error(f"移动任务失败: {e}")
-            self.status_label.config(text="移动任务出错")
-            messagebox.showerror("错误", f"移动任务失败: {str(e)}")
+    #def _move_task(self, direction):
+    #    """移动任务的核心逻辑，优化边界检查和状态更新"""
+    #    try:
+    #        selected = self.tree.selection()
+    #        if not selected:
+    #            messagebox.showinfo("提示", "请先选择要移动的任务")
+    #            return
+    #
+    #        item = selected[0]
+    #        current_idx = self.tree.index(item)
+    #        new_idx = current_idx + direction
+    #
+    #        if 0 <= new_idx < len(self.tree.get_children()):
+    #            self.tree.move(item, "", new_idx)
+    #            self.update_task_order()
+    #            self.status_label.config(text=f"任务已{'上移' if direction < 0 else '下移'}")
+    #            # 保持选择状态
+    #            self.tree.selection_set(item)
+    #            self.tree.focus(item)
+    #        else:
+    #            self.status_label.config(text="已到达列表顶部或底部")
+    #
+    #    except Exception as e:
+    #        logging.error(f"移动任务失败: {e}")
+    #        self.status_label.config(text="移动任务出错")
+    #        messagebox.showerror("错误", f"移动任务失败: {str(e)}")
 
     def update_task_order(self):
         """更新任务顺序并保存"""
@@ -1174,6 +1206,20 @@ class AudioPlayer:
         """保存所有任务，按开始时间排序并重新分配 task_id"""
         try:
             tasks = []
+            current_playing_info = None
+            
+            # 保存当前正在播放的任务信息
+            if self.current_playing_item and self.current_playing_sound:
+                try:
+                    current_playing_values = self.tree.item(self.current_playing_item)["values"]
+                    current_playing_info = {
+                        "name": current_playing_values[1],
+                        "startTime": current_playing_values[2],
+                        "audioPath": current_playing_values[6]
+                    }
+                except:
+                    current_playing_info = None
+            
             # 收集所有任务数据
             for item in self.tree.get_children():
                 values = list(self.tree.item(item)["values"])
@@ -1203,15 +1249,28 @@ class AudioPlayer:
             if success:
                 # 更新 Treeview 和 task_id_map
                 self.tree.configure(displaycolumns=())
+                old_task_id_map = self.task_id_map.copy()
                 self.task_id_map.clear()  # 清空现有映射
+                
+                # 更新每个任务项
                 for i, item in enumerate(self.tree.get_children()):
                     values = list(self.tree.item(item)["values"])
                     task = tasks[i]
-                    is_playing = item == self.current_playing_item and self.current_playing_sound
+                    
+                    # 检查是否是当前播放的任务
+                    is_playing = False
+                    if current_playing_info:
+                        is_playing = (task["name"] == current_playing_info["name"] and 
+                                    task["startTime"] == current_playing_info["startTime"] and 
+                                    task["audioPath"] == current_playing_info["audioPath"])
+                        if is_playing:
+                            self.current_playing_item = item  # 更新正在播放的任务项引用
+                    
                     values[0] = f"▶ {task['id']}" if is_playing else task["id"]
                     values[-1] = task["status"]
                     self.tree.item(item, values=values)
                     self.task_id_map[item] = task["id"]  # 更新内存映射
+                    
                 self.tree.configure(displaycolumns=self.columns)
                 self.status_label.config(text=f"已保存并按开始时间排序 {len(tasks)} 个任务")
                 return True
