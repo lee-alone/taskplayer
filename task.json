@@ -17,16 +17,6 @@
         "volume": 100,
         "schedule": "一, 二, 三, 四, 五",
         "audioPath": "C:/Users/lel99/Desktop/mp3/周杰伦 - 发如雪.mp3",
-        "status": "等待播放"
-    },
-    {
-        "id": "3",
-        "name": "三",
-        "startTime": "07:35:35",
-        "endTime": "07:39:51",
-        "volume": 100,
-        "schedule": "一, 二, 三, 四, 五",
-        "audioPath": "waiting",
-        "status": "waiting"
+        "status": "已播放"
     }
 ]

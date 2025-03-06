@@ -526,9 +526,7 @@ class AudioPlayer:
         """添加任务到 Treeview，优化状态判断并维护 task_id_map"""
         try:
             if isinstance(task, dict):
-                values = [task.get('id', ''), task.get('name', ''), task.get('startTime', ''),
-                        task.get('endTime', ''), task.get('volume', ''), task.get('schedule', ''),
-                        task.get('audioPath', ''), task.get('status', 'waiting')]
+                values = [task.get('id', ''), task.get('name', ''), task.get('startTime', ''), task.get('endTime', ''), task.get('volume', ''), task.get('schedule', ''), task.get('audioPath', ''), task.get('status', 'waiting')]
             else:
                 values = list(task) + ["waiting"] if len(task) < 8 else list(task)
 
