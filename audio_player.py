@@ -38,7 +38,8 @@ class ToolTip:
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class AudioPlayer:
-    def __init__(self):
+    def __init__(self, task_file_path=None):
+        self.task_file_path = task_file_path
         self.player = PlayerCore()
         self.task_manager = TaskManager()
         self.lock = threading.Lock()
@@ -132,8 +133,8 @@ class AudioPlayer:
         self.manual_stop = False
 
     def on_window_close(self):
-        """窗口关闭时保存任务"""
-        self.save_all_tasks()
+        """窗口关闭时同时保存到两个文件位置"""
+        self.save_all_tasks()  # 这里会同时保存到导入文件和默认文件
         self.root.destroy()
 
     
@@ -275,7 +276,6 @@ class AudioPlayer:
             self.tree.set(item, "序号", new_index)
         except Exception as e:
             logging.warning(f"更新任务序号失败: {e}")
-
 
     def toggle_playback(self, event=None):
         """切换播放/暂停状态"""
@@ -450,7 +450,7 @@ class AudioPlayer:
                 # 恢复任务
                 if item == self.current_playing_item:
                     self.stop_task()  # 如果正在播放，先停止
-                self.update_task_status(item, "等待播放", "waiting")
+                self.update_task_status(item, "等待播放", 'waiting')
                 self.status_label.config(text=f"任务 '{values[1]}' 已恢复今天播放")
                 all_paused = False
             else:
@@ -491,12 +491,15 @@ class AudioPlayer:
         # 右侧时间
         right_status_frame = tk.Frame(status_container, bg=BACKGROUND_COLOR)
         right_status_frame.pack(side=tk.RIGHT)
+        self.task_file_label = ttk.Label(right_status_frame, style="Custom.TLabel", text=f"当前任务文件: {self.task_file_path or TASK_FILE_PATH}", anchor="e")
+        self.task_file_label.pack(side=tk.RIGHT, padx=5)
         self.time_label = ttk.Label(right_status_frame, style="Custom.TLabel", width=25, anchor="e")
         self.time_label.pack(side=tk.RIGHT, padx=5)
 
     def load_tasks(self):
         """加载任务，优化批量插入性能并按开始时间排序"""
-        tasks = load_tasks()
+        task_file_path = self.task_file_path or TASK_FILE_PATH
+        tasks = load_tasks(task_file_path)
         if not tasks:
             self.status_label.config(text="无任务可加载")
             return
@@ -1163,7 +1166,11 @@ class AudioPlayer:
             
             self.save_all_tasks()
             total_tasks = len(valid_tasks)
+            self.task_file_path = file_path
+            from config_manager import save_task_file_path
+            save_task_file_path(file_path)
             self.status_label.config(text=f"已导入 {total_tasks} 个任务")
+            self.task_file_label.config(text=f"当前任务文件: {self.task_file_path or TASK_FILE_PATH}")
             messagebox.showinfo("成功", f"成功导入 {total_tasks} 个任务")
             
         except json.JSONDecodeError as e:
@@ -1216,29 +1223,16 @@ class AudioPlayer:
             messagebox.showerror("错误", f"导出失败: {str(e)}")
 
     def save_all_tasks(self):
-        """保存所有任务，按开始时间排序并重新分配 task_id"""
+        """保存所有任务并确保两个位置都得到更新"""
         try:
             tasks = []
-            current_playing_info = None
-            
-            # 保存当前正在播放的任务信息
-            if self.current_playing_item and self.current_playing_sound:
-                try:
-                    current_playing_values = self.tree.item(self.current_playing_item)["values"]
-                    current_playing_info = {
-                        "name": current_playing_values[1],
-                        "startTime": current_playing_values[2],
-                        "audioPath": current_playing_values[6]
-                    }
-                except:
-                    current_playing_info = None
             
             # 收集所有任务数据
             for item in self.tree.get_children():
                 values = list(self.tree.item(item)["values"])
                 original_index = str(values[0]).replace("▶ ", "").strip()
                 task_data = {
-                    "id": original_index,  # 临时保留原始 ID
+                    "id": original_index,
                     "name": values[1],
                     "startTime": values[2],
                     "endTime": values[3],
@@ -1249,43 +1243,18 @@ class AudioPlayer:
                 }
                 tasks.append(task_data)
             
-            # 按 startTime 排序
+            # 按开始时间排序
             tasks.sort(key=lambda x: x["startTime"])
             
-            # 重新分配 task_id，从 1 开始递增
+            # 重新分配ID
             for i, task in enumerate(tasks, 1):
                 task["id"] = str(i)
             
-            # 保存到文件
-            success = save_all_tasks(tasks)
+            # 保存到两个位置
+            success = save_all_tasks(tasks, self.task_file_path)
             
             if success:
-                # 更新 Treeview 和 task_id_map
-                self.tree.configure(displaycolumns=())
-                old_task_id_map = self.task_id_map.copy()
-                self.task_id_map.clear()  # 清空现有映射
-                
-                # 更新每个任务项
-                for i, item in enumerate(self.tree.get_children()):
-                    values = list(self.tree.item(item)["values"])
-                    task = tasks[i]
-                    
-                    # 检查是否是当前播放的任务
-                    is_playing = False
-                    if current_playing_info:
-                        is_playing = (task["name"] == current_playing_info["name"] and 
-                                    task["startTime"] == current_playing_info["startTime"] and 
-                                    task["audioPath"] == current_playing_info["audioPath"])
-                        if is_playing:
-                            self.current_playing_item = item  # 更新正在播放的任务项引用
-                    
-                    values[0] = f"▶ {task['id']}" if is_playing else task["id"]
-                    values[-1] = task["status"]
-                    self.tree.item(item, values=values)
-                    self.task_id_map[item] = task["id"]  # 更新内存映射
-                    
-                self.tree.configure(displaycolumns=self.columns)
-                self.status_label.config(text=f"已保存并按开始时间排序 {len(tasks)} 个任务")
+                self._refresh_tree_with_tasks(tasks)
                 return True
             else:
                 self.status_label.config(text="保存任务失败")
@@ -1295,6 +1264,34 @@ class AudioPlayer:
             logging.error(f"保存任务失败: {e}")
             self.status_label.config(text=f"保存任务出错: {str(e)}")
             return False
+
+    def _refresh_tree_with_tasks(self, tasks):
+        """刷新树形表格显示"""
+        try:
+            self.tree.configure(displaycolumns=())
+            self.tree.delete(*self.tree.get_children())
+            self.task_id_map.clear()
+            
+            for task in tasks:
+                values = [
+                    task["id"],
+                    task["name"],
+                    task["startTime"],
+                    task["endTime"],
+                    task["volume"],
+                    task["schedule"],
+                    task["audioPath"],
+                    task.get("status", "waiting")
+                ]
+                item = self.tree.insert("", "end", values=values)
+                self.task_id_map[item] = task["id"]
+            
+            self.tree.configure(displaycolumns=self.columns)
+            self.status_label.config(text=f"已更新 {len(tasks)} 个任务")
+            
+        except Exception as e:
+            logging.error(f"刷新显示失败: {e}")
+            raise
 
     def on_select(self, event):
         """选择任务时更新状态栏，优化性能，并动态调整暂停/恢复按钮"""

@@ -190,10 +190,11 @@ class AddTaskWindow:
                 self.minute_var.set(times[1].zfill(2))
                 self.second_var.set(times[2].zfill(2))
         else:
-            times = self.default_time.split(":")
-            self.hour_var.set(times[0].zfill(2))
-            self.minute_var.set(times[1].zfill(2))
-            self.second_var.set(times[2].zfill(2))
+            # 获取当前时间
+            now = datetime.datetime.now()
+            self.hour_var.set(f"{now.hour:02d}")
+            self.minute_var.set(f"{now.minute:02d}")
+            self.second_var.set(f"{now.second:02d}")
 
     def setup_file_path(self, parent, task_data=None):
         file_frame = ttk.LabelFrame(parent, text="音频文件", padding="10")
@@ -396,12 +397,50 @@ class AddTaskWindow:
             raise ValueError("\n".join(errors))
 
     def save_task(self):
+        """保存任务"""
         try:
             self.validate_inputs()
             task_data = self.prepare_task_data()
-            self.save_task_data(task_data, self.selected_item)
+            
+            # 构造完整的任务数据
+            task = {
+                "id": "0",  # 临时ID,后续会自动分配 
+                "name": task_data[0],
+                "startTime": task_data[1],
+                "endTime": task_data[2], 
+                "volume": task_data[3],
+                "schedule": task_data[4],
+                "audioPath": task_data[5],
+                "status": "waiting"
+            }
+
+            # 获取当前选中项和任务ID映射
+            selected_item = self.selected_item if hasattr(self, 'selected_item') else None
+            
+            # 保存任务
+            if selected_item:
+                # 编辑模式
+                self.player.tree.item(selected_item, values=[
+                    task["id"], task["name"], task["startTime"],
+                    task["endTime"], task["volume"], task["schedule"],
+                    task["audioPath"], task["status"]
+                ])
+            else:
+                # 新增模式
+                new_item = self.player.tree.insert("", "end", values=[
+                    task["id"], task["name"], task["startTime"],
+                    task["endTime"], task["volume"], task["schedule"],
+                    task["audioPath"], task["status"]
+                ])
+                self.player.task_id_map[new_item] = task["id"]
+
+            # 保存所有任务并重新加载
+            self.player.save_all_tasks()
+            self.player.load_tasks()  # 重新加载以更新显示
+            
             messagebox.showinfo("成功", "任务保存成功！")
             self.on_closing()
+            
         except ValueError as e:
             messagebox.showerror("输入错误", str(e))
         except Exception as e:

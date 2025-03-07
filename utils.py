@@ -50,12 +50,12 @@ def update_task_in_json(task_data):
         messagebox.showerror("保存错误", f"保存任务数据失败: {str(e)}")
         return False
 
-def load_tasks():
-    if not os.path.exists(TASK_FILE_PATH):
+def load_tasks(task_file_path=TASK_FILE_PATH):
+    if not os.path.exists(task_file_path):
         return []
 
     try:
-        with open(TASK_FILE_PATH, "r", encoding="utf-8") as f:
+        with open(task_file_path, "r", encoding="utf-8") as f:
             tasks = json.load(f)
             return tasks
     except json.JSONDecodeError:
@@ -94,11 +94,35 @@ def set_task_status(task_id, status):
         messagebox.showerror("保存错误", f"保存任务数据失败: {str(e)}")
         return False
 
-def save_all_tasks(tasks):
+def save_all_tasks_to_file(tasks, file_path):
+    """保存任务到指定文件，确保目录存在"""
     try:
-        with open(TASK_FILE_PATH, "w", encoding="utf-8") as f:
-            json.dump(tasks, f, ensure_ascii=False, indent=4)
+        if file_path:
+            # 确保目录存在
+            directory = os.path.dirname(file_path)
+            if directory and not os.path.exists(directory):
+                os.makedirs(directory)
+                
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(tasks, f, ensure_ascii=False, indent=4)
+            return True
+    except Exception as e:
+        logging.error(f"保存任务到文件失败: {e}")
+        return False
+
+def save_all_tasks(tasks, imported_file_path=None):
+    """同时保存到导入文件和默认文件"""
+    try:
+        # 先保存到导入的文件（如果存在）
+        if imported_file_path:
+            if not save_all_tasks_to_file(tasks, imported_file_path):
+                return False
+                
+        # 再保存到默认文件
+        if not save_all_tasks_to_file(tasks, TASK_FILE_PATH):
+            return False
+            
         return True
-    except IOError as e:
-        messagebox.showerror("保存错误", f"保存任务失败: {str(e)}")
+    except Exception as e:
+        logging.error(f"保存任务失败: {e}")
         return False
