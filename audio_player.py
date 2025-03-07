@@ -922,10 +922,11 @@ class AudioPlayer:
     def add_task(self):
         """添加新任务，优化窗口管理和默认值"""
         try:
-            default_end_time = "08:00:00"
-            selected = self.tree.selection()
-            if selected:
-                values = self.tree.item(selected[0])['values']
+            default_end_time = datetime.datetime.now().strftime("%H:%M:%S")
+            selected_items = self.tree.selection()
+            if selected_items:
+                selected_item = selected_items[0]
+                values = self.tree.item(selected_item)['values']
                 if len(values) > 3:
                     default_end_time = values[3]
             
